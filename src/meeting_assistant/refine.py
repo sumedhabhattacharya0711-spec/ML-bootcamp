@@ -142,25 +142,26 @@ def find_hints(segments, glossary, doubtful: set[int] | None = None) -> list[Hin
     """Score every span of every line against every glossary term and keep the
     best non-overlapping matches, at most MAX_HINTS."""
     doubtful = doubtful or set()
-    terms = [t for t in (_term_text(g) for g in glossary) if _clean(t)]
+    terms = [(t, _clean(t)) for t in (_term_text(g) for g in glossary) if _clean(t)]
     found = []
     for line, seg in enumerate(segments):
         if line in doubtful:
             continue  # don't "correct" text that may be a hallucination
         tokens = _seg_text(seg).split()
+        cleaned = [_clean(tok) for tok in tokens]
         probs = _word_probs(seg, len(tokens))
         for start, end in candidate_spans(tokens):
-            heard = " ".join(tokens[start:end])
-            heard_clean = _clean(heard)
+            span_words = cleaned[start:end]
+            heard_clean = "".join(span_words)
             if end - start == 1 and len(heard_clean) < MIN_SPAN_CHARS:
                 continue  # short single words; short multi-word spans ("on x", "G P U") are kept
-            if all(_clean(tok) in COMMON_WORDS for tok in tokens[start:end]):
+            if all(w in COMMON_WORDS for w in span_words):
                 continue
+            heard = " ".join(tokens[start:end])
             unsure = probs is not None and min(probs[start:end]) < UNSURE_PROB
             threshold = MATCH_SCORE_UNSURE if unsure else MATCH_SCORE
-            for term in terms:
-                term_clean = _clean(term)
-                if any(term_clean in _clean(tok) for tok in tokens[start:end]):
+            for term, term_clean in terms:
+                if any(term_clean in w for w in span_words):
                     continue  # one word already is the term ("in Grafana."); "G D P R" still counts
                 if not 0.5 <= len(heard_clean) / len(term_clean) <= 2:
                     continue  # lengths too different to be the same word
@@ -170,7 +171,7 @@ def find_hints(segments, glossary, doubtful: set[int] | None = None) -> list[Hin
                                       sound, spelling, unsure))
 
     # Best first; take a hint only if its words aren't already used by a better one.
-    found.sort(key=lambda h: -h.score)
+    found.sort(key=lambda h: h.score, reverse=True)
     chosen, used = [], set()
     for h in found:
         span = {(h.line, i) for i in range(h.start, h.end)}
@@ -314,9 +315,11 @@ def refine(segments, glossary, call_llm=None, doubtful: set[int] | None = None,
             i = int(item.get("line"))
         except (TypeError, ValueError):
             continue
+        if not 0 <= i < len(lines):
+            continue
         text = str(item.get("text", "")).strip()
         words = " ".join(_clean(w) for w in text.split())
-        line_words = " ".join(_clean(w) for w in lines[i].split()) if 0 <= i < len(lines) else ""
+        line_words = " ".join(_clean(w) for w in lines[i].split())
         if words and f" {words} " in f" {line_words} ":  # really in the raw line
             result.possible_errors.append(PossibleError(i, text, str(item.get("reason", ""))))
     return result
