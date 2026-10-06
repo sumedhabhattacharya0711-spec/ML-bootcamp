@@ -1,0 +1,20 @@
+# Speech-to-text (WhisperX pulls in torch, pyannote VAD/diarization, faster-whisper)
+whisperx
+faster-whisper
+
+# Audio handling
+soundfile
+numpy
+
+# LLM stages (provider-agnostic for now; add the SDK once the model is chosen)
+httpx
+pydantic
+python-dotenv
+rapidfuzz        # fuzzy matching against the domain-term glossary
+
+# UI
+gradio
+
+# Evaluation and tests
+jiwer            # word error rate
+pytest

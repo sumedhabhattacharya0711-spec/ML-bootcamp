@@ -1,0 +1,23 @@
+# Example preset pack: machine learning and software terms. One term per line.
+# Lines starting with # are ignored.
+Kubeflow
+Kubernetes
+ONNX
+LoRA
+PyTorch
+TensorFlow
+Hugging Face
+GPU
+CUDA
+MLOps
+Grafana
+Prometheus
+Docker
+GitHub
+CI/CD
+API
+LLM
+RAG
+fine-tuning
+inference
+GDPR
