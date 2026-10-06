@@ -20,6 +20,7 @@ import csv
 import re
 import sys
 from dataclasses import dataclass, field
+from itertools import groupby
 from pathlib import Path
 
 from meeting_assistant.paths import DATA_DIR
@@ -114,16 +115,11 @@ def _contains_phrase(text_norm: str, phrases: list[str]) -> str | None:
 def _repeat_runs(texts: list[str]) -> list[int]:
     """For each segment, how many consecutive segments (including itself) have
     the same text. 1 = not repeated."""
-    run_len = [1] * len(texts)
-    i = 0
-    while i < len(texts):
-        j = i
-        while j + 1 < len(texts) and texts[j + 1] and texts[j + 1] == texts[i]:
-            j += 1
-        for k in range(i, j + 1):
-            run_len[k] = j - i + 1
-        i = j + 1
-    return run_len
+    runs = []
+    for text, group in groupby(texts):
+        n = len(list(group))
+        runs += [n if text else 1] * n  # empty lines never count as repeats
+    return runs
 
 
 def score_segments(segments, duration_s: float) -> list[SegmentFlag]:
@@ -131,7 +127,7 @@ def score_segments(segments, duration_s: float) -> list[SegmentFlag]:
     start, text, no_speech_prob, avg_logprob, compression_ratio works)."""
     texts = [_norm(s.text) for s in segments]
     runs = _repeat_runs(texts)
-    end_start = duration_s * (1 - END_FRACTION)
+    end_zone_start = duration_s * (1 - END_FRACTION)
 
     results = []
     for i, seg in enumerate(segments):
@@ -153,7 +149,7 @@ def score_segments(segments, duration_s: float) -> list[SegmentFlag]:
             # or subtitle phrase, or 3+ in a row. Two real lines in a row
             # ("Yeah." "Yeah.") stay at 1 point and are not flagged.
             suspicious_repeat = is_phantom or phrase or runs[i] >= MIN_PLAIN_REPEAT
-            if seg.start < end_start and suspicious_repeat:
+            if seg.start < end_zone_start and suspicious_repeat:
                 score += 1
                 reasons.append(f"repeated {runs[i]}x mid-meeting")
             else:
