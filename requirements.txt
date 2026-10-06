@@ -11,6 +11,7 @@ httpx
 pydantic
 python-dotenv
 rapidfuzz        # fuzzy matching against the domain-term glossary
+jellyfish        # Metaphone codes for sound-alike matching in refine.py
 
 # UI
 gradio
