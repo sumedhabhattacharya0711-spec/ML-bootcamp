@@ -9,7 +9,7 @@ are dropped. Owners and deadlines are "unspecified" unless a checked quote
 supports them. Lines flagged as possible hallucinations are marked
 [DOUBTFUL] for the LLM and never count as evidence.
 
-Try it:  python minutes.py data/audio/ES2004a.wav
+Try it:  python -m meeting_assistant.minutes data/audio/ES2004a.wav
 """
 
 import json
@@ -22,7 +22,9 @@ from typing import Literal
 from pydantic import BaseModel
 from rapidfuzz import fuzz
 
-PROMPT_PATH = Path(__file__).parent / "prompts" / "minutes_system.txt"
+from meeting_assistant.paths import PROMPTS_DIR
+
+PROMPT_PATH = PROMPTS_DIR / "minutes_system.txt"
 QUOTE_MIN_SCORE = 90  # rapidfuzz.partial_ratio needed for a quote to count as real
 
 # A quote that is ONLY one of these is a backchannel, not agreement.
@@ -215,11 +217,11 @@ def to_json(m: Minutes) -> str:
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
-        print("Usage: python minutes.py <audio file> [model size]")
+        print("Usage: python -m meeting_assistant.minutes <audio file> [model size]")
         sys.exit(1)
-    from hallucination import doubtful_indices, score_segments
-    from llm import LLMError, call_llm_structured
-    from stt import AudioInputError, load_model, transcribe
+    from meeting_assistant.hallucination import doubtful_indices, score_segments
+    from meeting_assistant.llm import LLMError, call_llm_structured
+    from meeting_assistant.stt import AudioInputError, load_model, transcribe
 
     audio, size = sys.argv[1], (sys.argv[2] if len(sys.argv) > 2 else "medium")
     try:

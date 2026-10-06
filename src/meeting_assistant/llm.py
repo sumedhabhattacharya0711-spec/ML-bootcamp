@@ -6,8 +6,8 @@ call_llm_structured(system, user, Model)  -> pydantic object  (minutes.py)
 Every failure becomes an LLMError with a plain-English message that the UI
 can show next to the stage that failed.
 
-Try it:  python llm.py            (sends a tiny test message)
-         python llm.py --models   (lists the models your key can use)
+Try it:  python -m meeting_assistant.llm            (sends a tiny test message)
+         python -m meeting_assistant.llm --models   (lists the models your key can use)
 """
 
 import os
@@ -15,13 +15,14 @@ import sys
 import time
 from dataclasses import dataclass
 from functools import lru_cache
-from pathlib import Path
 
 import openai
 from dotenv import load_dotenv
 from pydantic import BaseModel, ValidationError
 
-load_dotenv(Path(__file__).parent / ".env")
+from meeting_assistant.paths import PROJECT_DIR
+
+load_dotenv(PROJECT_DIR / ".env")
 
 # ---------- Settings (move to config.yaml later) ----------
 

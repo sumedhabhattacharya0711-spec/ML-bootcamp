@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from stt import AudioInputError, check_audio
+from meeting_assistant.stt import AudioInputError, check_audio
 
 PROJECT_DIR = Path(__file__).parent.parent
 CLIP = PROJECT_DIR / "data" / "audio" / "ES2004a_1min.wav"
@@ -65,7 +65,7 @@ def test_good_file_returns_duration(tmp_path):
 @pytest.mark.slow
 @pytest.mark.skipif(not CLIP.exists(), reason="1-minute clip not in data/audio")
 def test_whisper_on_real_clip():
-    from stt import load_model, transcribe
+    from meeting_assistant.stt import load_model, transcribe
 
     model = load_model("medium")
     result = transcribe(CLIP, model)

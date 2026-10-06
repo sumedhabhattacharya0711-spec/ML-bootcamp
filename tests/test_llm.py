@@ -5,7 +5,7 @@ import openai
 import pytest
 from pydantic import BaseModel
 
-import llm
+from meeting_assistant import llm
 
 
 class Answer(BaseModel):

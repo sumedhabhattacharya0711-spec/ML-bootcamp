@@ -1,6 +1,6 @@
 from types import SimpleNamespace
 
-from hallucination import doubtful_indices, score_segments
+from meeting_assistant.hallucination import doubtful_indices, score_segments
 
 
 def seg(text, start, no_speech_prob=0.05, avg_logprob=-0.3, compression_ratio=1.5):
@@ -85,7 +85,7 @@ def test_doubtful_indices():
 
 
 def test_boh_list_is_loaded():
-    from hallucination import PHANTOM_PHRASES, load_boh
+    from meeting_assistant.hallucination import PHANTOM_PHRASES, load_boh
     boh = load_boh()
     assert len(boh) == 294
     assert "the train is now moving towards the central station" in PHANTOM_PHRASES

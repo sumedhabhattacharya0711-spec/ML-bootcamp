@@ -15,7 +15,7 @@ guard reverts unsafe edits.
 6. "Possible error, not changed" flags from the LLM, kept only if the words
    really are in the line. Never applied.
 
-Try it:  python refine.py data/audio/ES2004a_1min.wav --terms "Kubeflow, ONNX" --hints-only
+Try it:  python -m meeting_assistant.refine data/audio/ES2004a_1min.wav --terms "Kubeflow, ONNX" --hints-only
 """
 
 import json
@@ -28,9 +28,10 @@ from pathlib import Path
 import jellyfish
 from rapidfuzz import fuzz
 
-from glossary import GlossaryInferError, Term, _parse_json_reply
+from meeting_assistant.glossary import GlossaryInferError, Term, _parse_json_reply
+from meeting_assistant.paths import PROMPTS_DIR
 
-PROMPT_PATH = Path(__file__).parent / "prompts" / "refine_system.txt"
+PROMPT_PATH = PROMPTS_DIR / "refine_system.txt"
 
 # ---------- Settings (starting values; eval.py tunes them) ----------
 
@@ -331,9 +332,9 @@ if __name__ == "__main__":
     parser.add_argument("--model-size", default="medium")
     args = parser.parse_args()
 
-    from glossary import build_glossary
-    from hallucination import doubtful_indices, score_segments
-    from stt import AudioInputError, load_model, transcribe
+    from meeting_assistant.glossary import build_glossary
+    from meeting_assistant.hallucination import doubtful_indices, score_segments
+    from meeting_assistant.stt import AudioInputError, load_model, transcribe
 
     packs = [p.strip() for p in args.packs.split(",") if p.strip()]
     terms, _ = build_glossary(args.terms, packs=packs)
@@ -346,7 +347,7 @@ if __name__ == "__main__":
 
     call = None
     if not args.hints_only:
-        from llm import LLMError, call_llm
+        from meeting_assistant.llm import LLMError, call_llm
         call = call_llm
     try:
         r = refine(t.segments, terms, call, doubtful)

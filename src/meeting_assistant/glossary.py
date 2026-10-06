@@ -17,9 +17,9 @@ from typing import Callable
 
 from rapidfuzz import fuzz
 
-PROJECT_DIR = Path(__file__).parent
-PACKS_DIR = PROJECT_DIR / "data" / "glossary"
-INFER_PROMPT_PATH = PROJECT_DIR / "prompts" / "glossary_infer.txt"
+from meeting_assistant.paths import DATA_DIR, PROMPTS_DIR
+PACKS_DIR = DATA_DIR / "glossary"
+INFER_PROMPT_PATH = PROMPTS_DIR / "glossary_infer.txt"
 
 # Lower number = more trusted. Used for ordering and for what gets dropped first.
 SOURCE_PRIORITY = {"user": 0, "inferred": 1, "pack": 2}

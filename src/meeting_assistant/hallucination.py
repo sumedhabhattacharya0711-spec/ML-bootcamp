@@ -13,7 +13,7 @@ Phrase lists:
 - The condensed list in prompt 02 of
   https://github.com/DSP-AGH/asr_hallucination_detection_prompts
 
-Try it:  python hallucination.py data/audio/ES2004a.wav
+Try it:  python -m meeting_assistant.hallucination data/audio/ES2004a.wav
 """
 
 import csv
@@ -22,7 +22,9 @@ import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
-BOH_PATH = Path(__file__).parent / "data" / "hallucination" / "BoH.csv"
+from meeting_assistant.paths import DATA_DIR
+
+BOH_PATH = DATA_DIR / "hallucination" / "BoH.csv"
 
 # ---------- Thresholds (starting guesses; tune on test clips) ----------
 
@@ -177,9 +179,9 @@ def doubtful_indices(flags: list[SegmentFlag]) -> set[int]:
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
-        print("Usage: python hallucination.py <audio file> [model size]")
+        print("Usage: python -m meeting_assistant.hallucination <audio file> [model size]")
         sys.exit(1)
-    from stt import AudioInputError, load_model, transcribe, _fmt
+    from meeting_assistant.stt import AudioInputError, load_model, transcribe, _fmt
 
     audio, size = sys.argv[1], (sys.argv[2] if len(sys.argv) > 2 else "medium")
     try:

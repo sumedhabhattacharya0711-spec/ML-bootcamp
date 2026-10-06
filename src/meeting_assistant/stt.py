@@ -6,7 +6,7 @@ load_model()   - load faster-whisper once (GPU if available, else CPU).
 transcribe()   - run Whisper with VAD and word timestamps; return the raw
                  transcript with per-segment and per-word confidences.
 
-Try it:  python stt.py data/audio/ES2004a_1min.wav
+Try it:  python -m meeting_assistant.stt data/audio/ES2004a_1min.wav
 """
 
 import json
@@ -17,7 +17,7 @@ import time
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
-from glossary import Term, to_initial_prompt
+from meeting_assistant.glossary import Term, to_initial_prompt
 
 SUPPORTED_EXTENSIONS = {".wav", ".mp3", ".m4a", ".flac", ".ogg", ".webm", ".mp4"}
 MIN_DURATION_S = 1.0
@@ -191,7 +191,7 @@ def _fmt(t: float) -> str:
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
-        print("Usage: python stt.py <audio file> [model size]")
+        print("Usage: python -m meeting_assistant.stt <audio file> [model size]")
         sys.exit(1)
     audio, size = sys.argv[1], (sys.argv[2] if len(sys.argv) > 2 else "medium")
     try:

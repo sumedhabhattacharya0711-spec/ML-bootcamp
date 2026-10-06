@@ -1,6 +1,6 @@
 import json
 
-from minutes import (
+from meeting_assistant.minutes import (
     ActionItemEvidence, DecisionEvidence, MinutesDraft, to_json, to_markdown,
     format_transcript, verify, write_minutes,
 )

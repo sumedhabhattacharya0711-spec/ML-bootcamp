@@ -1,6 +1,6 @@
 import json
 
-from glossary import (
+from meeting_assistant.glossary import (
     Term,
     build_glossary,
     infer_terms,
@@ -114,7 +114,7 @@ def test_infer_short_heard_as_must_match_exactly():
 
 
 def test_doubtful_segments_are_not_sent_to_llm():
-    from glossary import transcript_for_inference
+    from meeting_assistant.glossary import transcript_for_inference
     segments = ["we moved jobs to cube flow", "thanks for watching, subscribe to NordVPN", "see you"]
     assert transcript_for_inference(segments, {1}) == "we moved jobs to cube flow see you"
 

@@ -1,8 +1,8 @@
 import json
 from types import SimpleNamespace
 
-from glossary import Term
-from refine import candidate_spans, find_hints, guard_line, refine, score_match
+from meeting_assistant.glossary import Term
+from meeting_assistant.refine import candidate_spans, find_hints, guard_line, refine, score_match
 
 GLOSSARY = ["Kubeflow", "ONNX", "LoRA", "GDPR", "Grafana"]
 
