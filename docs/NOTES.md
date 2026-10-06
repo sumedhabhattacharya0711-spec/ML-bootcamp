@@ -97,3 +97,14 @@ was checked with the full test suite plus real runs on the AMI ES2004a clip.
   `condition_on_previous_text=False`, faster-whisper only uses that for the
   first 30-second window. faster-whisper's `hotwords` setting applies the
   hint to every window; switching to it is a pending fix.
+
+## Build log
+
+- **pipeline.py** (new): runs Stage 1 -> 1b -> glossary -> Stage 2 -> Stage 3
+  with a status per stage (done / failed / skipped + message + seconds).
+  A bad file fails Stage 1 and skips the rest; a Stage 2 failure still lets
+  Stage 3 run on the raw transcript; a Stage 3 failure keeps both transcripts.
+  Every run is saved to `runs/<timestamp>/`: `transcript_raw.txt`,
+  `transcript_refined.txt`, `edit_log.json`, `minutes.md`, `minutes.json`,
+  `run.json` (statuses, segments, flags, glossary, LLM token usage).
+  Tests: `tests/test_pipeline.py` (fake Whisper model + fake LLM, 4 tests).
