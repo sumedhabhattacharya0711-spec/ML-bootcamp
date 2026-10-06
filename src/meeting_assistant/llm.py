@@ -112,8 +112,8 @@ def _send(method: str, system: str, user: str, model: str, **kwargs):
     usage = response.usage
     usage_log.append(LLMUsage(
         model=model,
-        input_tokens=getattr(usage, "prompt_tokens", 0) if usage else 0,
-        output_tokens=getattr(usage, "completion_tokens", 0) if usage else 0,
+        input_tokens=usage.prompt_tokens if usage else 0,
+        output_tokens=usage.completion_tokens if usage else 0,
         seconds=round(time.perf_counter() - started, 2),
     ))
     return response
@@ -153,11 +153,9 @@ def call_llm_structured(system: str, user: str, schema: type[BaseModel],
     for _attempt in range(2):
         try:
             response = _send("parse", system, user, model or MODEL, response_format=schema)
-        except LLMError as e:
-            if isinstance(e.__cause__, ValidationError):
-                last_problem = _missing_field(e.__cause__)
-                continue
-            raise
+        except ValidationError as e:  # parse() validates the reply itself and raises this
+            last_problem = _missing_field(e)
+            continue
         message = response.choices[0].message
         if message.refusal:
             last_problem = f"the model refused: {message.refusal}"

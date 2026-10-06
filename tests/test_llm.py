@@ -3,7 +3,7 @@ from types import SimpleNamespace
 import httpx
 import openai
 import pytest
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
 from meeting_assistant import llm
 
@@ -102,3 +102,22 @@ def test_model_without_temperature_is_retried(fake):
                  fake_response("OK"))
     assert llm.call_llm("sys", "user", model="reasoning-test-model") == "OK"
     assert "temperature" not in calls.calls[1]
+
+
+def validation_error():
+    try:
+        Answer.model_validate({})
+    except ValidationError as e:
+        return e
+
+
+def test_structured_retries_when_parse_raises_validation_error(fake):
+    calls = fake(validation_error(), fake_response(parsed=Answer(owner="Sarah")))
+    assert llm.call_llm_structured("sys", "user", Answer).owner == "Sarah"
+    assert len(calls.calls) == 2
+
+
+def test_structured_validation_error_twice_is_friendly(fake):
+    fake(validation_error(), validation_error())
+    with pytest.raises(llm.LLMError, match="failed validation: owner: Field required"):
+        llm.call_llm_structured("sys", "user", Answer)
