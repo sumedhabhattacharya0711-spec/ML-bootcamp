@@ -25,7 +25,7 @@ INFER_PROMPT_PATH = PROMPTS_DIR / "glossary_infer.txt"
 # Lower number = more trusted. Used for ordering and for what gets dropped first.
 SOURCE_PRIORITY = {"user": 0, "inferred": 1, "pack": 2}
 
-# call_llm(system_prompt, user_message) -> reply text. Provided by llm.py later.
+# call_llm(system_prompt, user_message) -> reply text: llm.call_llm, or a fake in tests.
 CallLLM = Callable[[str, str], str]
 
 

@@ -50,14 +50,13 @@ def test_correct_term_gives_no_hint():
 
 
 def test_unsure_word_uses_lower_threshold():
-    # "graffiti" vs Grafana: below 72 normally, above 65 if Whisper was unsure.
-    sure = find_hints([seg("check graffiti now", [0.9, 0.9, 0.9])], ["Grafana"])
-    unsure = find_hints([seg("check graffiti now", [0.9, 0.2, 0.9])], ["Grafana"])
-    score = score_match("graffiti", "Grafana")[2]
-    if 65 < score <= 72:
-        assert sure == [] and len(unsure) == 1 and unsure[0].unsure
-    else:  # if the metric moves, at least the unsure flag must be right
-        assert all(not h.unsure for h in sure)
+    # "grabant" vs Grafana scores 69: no hint normally (needs > 72),
+    # a hint when Whisper was unsure of that word (needs > 65).
+    assert 65 < score_match("grabant", "Grafana")[2] <= 72
+    sure = find_hints([seg("check grabant now", [0.9, 0.9, 0.9])], ["Grafana"])
+    unsure = find_hints([seg("check grabant now", [0.9, 0.2, 0.9])], ["Grafana"])
+    assert sure == []
+    assert len(unsure) == 1 and unsure[0].unsure
 
 
 def test_hints_capped_and_non_overlapping():
