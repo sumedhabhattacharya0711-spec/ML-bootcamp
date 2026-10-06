@@ -9,7 +9,6 @@ Stage 1 uses to_initial_prompt() to bias Whisper's spelling.
 Stage 2 (refine.py) uses the full list to propose correction hints.
 """
 
-import json
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -17,7 +16,9 @@ from typing import Callable
 
 from rapidfuzz import fuzz
 
+from meeting_assistant.llm import LLMError, parse_json_reply
 from meeting_assistant.paths import DATA_DIR, PROMPTS_DIR
+
 PACKS_DIR = DATA_DIR / "glossary"
 INFER_PROMPT_PATH = PROMPTS_DIR / "glossary_infer.txt"
 
@@ -74,21 +75,6 @@ def load_packs(names: list[str], packs_dir: Path = PACKS_DIR) -> list[Term]:
 
 # ---------- Source 2: inferred by the LLM ----------
 
-class GlossaryInferError(Exception):
-    pass
-
-
-def _parse_json_reply(reply: str) -> dict:
-    """Parse the LLM reply, tolerating ```json fences or text around the object."""
-    match = re.search(r"\{.*\}", reply, re.DOTALL)
-    if not match:
-        raise GlossaryInferError("LLM reply contained no JSON object")
-    try:
-        return json.loads(match.group(0))
-    except json.JSONDecodeError as e:
-        raise GlossaryInferError(f"LLM reply was not valid JSON: {e}") from e
-
-
 def _appears_in(phrase: str, transcript_norm: str) -> bool:
     """True if the phrase (or a near-exact copy of it) is in the transcript."""
     phrase = _norm(phrase)
@@ -118,16 +104,16 @@ def infer_terms(
 ) -> list[Term]:
     """Ask the LLM which domain terms the meeting is about, then keep only the
     terms whose "heard_as" text (or the term itself) really appears in the transcript.
-    The LLM suggests; Python verifies. Raises GlossaryInferError on a bad reply."""
+    The LLM suggests; Python verifies. Raises LLMError on a bad reply."""
     if not raw_transcript.strip():
         return []
     system = prompt_path.read_text(encoding="utf-8")
     reply = call_llm(system, raw_transcript[:max_transcript_chars])
-    data = _parse_json_reply(reply)
+    data = parse_json_reply(reply)
 
     items = data.get("terms")
     if not isinstance(items, list):
-        raise GlossaryInferError('LLM reply is missing the "terms" list')
+        raise LLMError('LLM reply is missing the "terms" list')
 
     transcript_norm = _norm(raw_transcript)
     terms = []

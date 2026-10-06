@@ -10,7 +10,9 @@ Try it:  python -m meeting_assistant.llm            (sends a tiny test message)
          python -m meeting_assistant.llm --models   (lists the models your key can use)
 """
 
+import json
 import os
+import re
 import sys
 import time
 from dataclasses import dataclass
@@ -115,6 +117,18 @@ def _send(method: str, system: str, user: str, model: str, **kwargs):
         seconds=round(time.perf_counter() - started, 2),
     ))
     return response
+
+
+def parse_json_reply(reply: str) -> dict:
+    """Parse a plain-text reply that should contain one JSON object,
+    tolerating ```json fences or text around it."""
+    match = re.search(r"\{.*\}", reply, re.DOTALL)
+    if not match:
+        raise LLMError("LLM reply contained no JSON object")
+    try:
+        return json.loads(match.group(0))
+    except json.JSONDecodeError as e:
+        raise LLMError(f"LLM reply was not valid JSON: {e}") from e
 
 
 def call_llm(system: str, user: str, model: str | None = None) -> str:

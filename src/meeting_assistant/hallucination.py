@@ -181,7 +181,7 @@ if __name__ == "__main__":
     if len(sys.argv) < 2:
         print("Usage: python -m meeting_assistant.hallucination <audio file> [model size]")
         sys.exit(1)
-    from meeting_assistant.stt import AudioInputError, load_model, transcribe, _fmt
+    from meeting_assistant.stt import AudioInputError, format_timestamp, load_model, transcribe
 
     audio, size = sys.argv[1], (sys.argv[2] if len(sys.argv) > 2 else "medium")
     try:
@@ -194,5 +194,5 @@ if __name__ == "__main__":
     flagged = [f for f in flags if f.flagged]
     for f in flagged:
         s = transcript.segments[f.index]
-        print(f"[{_fmt(s.start)}] score {f.score}: {s.text!r}  <- {f.reason_text}")
+        print(f"[{format_timestamp(s.start)}] score {f.score}: {s.text!r}  <- {f.reason_text}")
     print(f"\n{len(flagged)} of {len(flags)} segments flagged as possible hallucinations")

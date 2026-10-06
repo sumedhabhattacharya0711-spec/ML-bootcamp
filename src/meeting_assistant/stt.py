@@ -185,7 +185,8 @@ def transcribe(path: str | Path, model, glossary_terms: list[Term] | None = None
     )
 
 
-def _fmt(t: float) -> str:
+def format_timestamp(t: float) -> str:
+    """83.5 -> "01:23.50"."""
     return f"{int(t // 60):02d}:{t % 60:05.2f}"
 
 
@@ -206,6 +207,6 @@ if __name__ == "__main__":
 
     result = transcribe(audio, model, model_size=size)
     for s in result.segments:
-        print(f"[{_fmt(s.start)} - {_fmt(s.end)}] {s.text}")
+        print(f"[{format_timestamp(s.start)} - {format_timestamp(s.end)}] {s.text}")
     print(f"\n{len(result.segments)} segments, {result.duration_s:.0f} s of audio "
           f"transcribed in {result.transcribe_s:.1f} s")

@@ -28,7 +28,8 @@ from pathlib import Path
 import jellyfish
 from rapidfuzz import fuzz
 
-from meeting_assistant.glossary import GlossaryInferError, Term, _parse_json_reply
+from meeting_assistant.glossary import Term
+from meeting_assistant.llm import LLMError, parse_json_reply
 from meeting_assistant.paths import PROMPTS_DIR
 
 PROMPT_PATH = PROMPTS_DIR / "refine_system.txt"
@@ -287,8 +288,8 @@ def refine(segments, glossary, call_llm=None, doubtful: set[int] | None = None,
     reply = call_llm(system, build_llm_input(lines, result.hints))
     result.llm_called = True
     try:
-        data = _parse_json_reply(reply)
-    except GlossaryInferError as e:
+        data = parse_json_reply(reply)
+    except LLMError as e:
         result.warnings.append(f"Refinement skipped, transcript kept as is: {e}")
         return result
 
