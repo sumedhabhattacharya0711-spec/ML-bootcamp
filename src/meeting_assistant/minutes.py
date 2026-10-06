@@ -12,7 +12,6 @@ supports them. Lines flagged as possible hallucinations are marked
 Try it:  python -m meeting_assistant.minutes data/audio/ES2004a.wav
 """
 
-import json
 import re
 import sys
 from dataclasses import dataclass, field
@@ -124,15 +123,10 @@ def decide_status(d: DecisionEvidence, transcript_norm: str) -> tuple[str, list[
                 continue
             bucket.append(pos)
 
-    if agreements and rejections:
-        status = "agreed" if max(agreements) > max(rejections) else "rejected"
-    elif agreements:
-        status = "agreed"
-    elif rejections:
-        status = "rejected"
-    else:
-        status = "open"
-    return status, notes
+    if not agreements and not rejections:
+        return "open", notes
+    latest_agreement, latest_rejection = max(agreements, default=-1), max(rejections, default=-1)
+    return ("agreed" if latest_agreement > latest_rejection else "rejected"), notes
 
 
 def _supported(value: str, quote: str, transcript_norm: str) -> bool:
@@ -161,13 +155,16 @@ def verify(draft: MinutesDraft, evidence_text: str) -> MinutesResult:
         if _quote_position(a.task_quote, transcript_norm) is None:
             dropped.append(f'Action item dropped, quote not in transcript: "{a.task}"')
             continue
-        owner = a.owner if _supported(a.owner, a.owner_quote, transcript_norm) else "unspecified"
-        deadline = a.deadline if _supported(a.deadline, a.deadline_quote, transcript_norm) else "unspecified"
-        if owner != a.owner and a.owner.strip().lower() != "unspecified":
-            dropped.append(f'"{a.task}": owner "{a.owner}" not supported by a quote, set to unspecified')
-        if deadline != a.deadline and a.deadline.strip().lower() != "unspecified":
-            dropped.append(f'"{a.task}": deadline "{a.deadline}" not supported by a quote, set to unspecified')
-        actions.append(ActionItem(task=a.task, owner=owner, deadline=deadline, quote=a.task_quote))
+        checked = {}
+        for name, value, quote in (("owner", a.owner, a.owner_quote),
+                                   ("deadline", a.deadline, a.deadline_quote)):
+            if _supported(value, quote, transcript_norm):
+                checked[name] = value
+                continue
+            checked[name] = "unspecified"
+            if value.strip().lower() != "unspecified":
+                dropped.append(f'"{a.task}": {name} "{value}" not supported by a quote, set to unspecified')
+        actions.append(ActionItem(task=a.task, quote=a.task_quote, **checked))
 
     minutes = Minutes(summary=draft.summary, minutes=draft.minutes,
                       decisions=decisions, action_items=actions)
@@ -212,7 +209,7 @@ def to_markdown(m: Minutes) -> str:
 
 
 def to_json(m: Minutes) -> str:
-    return json.dumps(m.model_dump(), indent=2, ensure_ascii=False)
+    return m.model_dump_json(indent=2)
 
 
 if __name__ == "__main__":
