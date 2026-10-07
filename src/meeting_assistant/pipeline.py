@@ -76,6 +76,11 @@ class PipelineResult:
         return self.transcript.segments if self.transcript else []
 
     @property
+    def roles(self) -> dict[str, str]:
+        """{speaker label: stated role} for speakers with a role."""
+        return {s.label: s.role for s in self.speakers if s.role}
+
+    @property
     def labels(self) -> list[str | None]:
         """Speaker label of every line ("Priya", "Speaker 2"), or None per line."""
         return line_labels(self.segments, self.speakers) if self.speakers else [None] * len(self.segments)
@@ -186,7 +191,8 @@ def run(audio_path, model, glossary_text: str = "", packs: list[str] | None = No
             named = [s for s in result.speakers if s.name]
             names_stage.status = "done"
             names_stage.message = (f"{len(named)} of {len(result.speakers)} speakers named"
-                                   + (": " + ", ".join(s.name for s in named) if named else ""))
+                                   + (": " + ", ".join(s.name + (f" ({s.role})" if s.role else "")
+                                                       for s in named) if named else ""))
         except Exception as e:  # LLMError or anything else: speakers stay "Speaker N"
             names_stage.status, names_stage.message = "failed", f"{e}; speakers stay unnamed"
     names_stage.seconds = _since(started)
@@ -197,7 +203,8 @@ def run(audio_path, model, glossary_text: str = "", packs: list[str] | None = No
     try:
         result.minutes = write_minutes(minutes_input, call_structured, doubtful,
                                        [seg.start for seg in segments], call_text=call_llm,
-                                       speakers=result.labels if result.speakers else None)
+                                       speakers=result.labels if result.speakers else None,
+                                       roles=result.roles)
         minutes_stage.status = "done"
         parts = result.minutes.checks.get("parts", 1)
         minutes_stage.message = (f"{len(result.minutes.dropped)} items removed or downgraded by the checks"
@@ -212,14 +219,16 @@ def run(audio_path, model, glossary_text: str = "", packs: list[str] | None = No
     return result
 
 
-def rename_speakers(result: PipelineResult, names: dict[str, str]) -> dict[str, str]:
-    """Apply names typed by the user ({speaker id: name}) to the transcripts and
-    the meeting record, and rewrite the run's saved files. No model is run
-    again. Returns {old label: new label}."""
-    changes = speakers_mod.rename_speakers(result.speakers, names)
-    if changes and result.minutes:
-        rename_in_minutes(result.minutes.minutes, changes, result.labels)
-    if changes and result.run_dir:
+def rename_speakers(result: PipelineResult, names: dict[str, str],
+                    roles: dict[str, str] | None = None) -> dict[str, str]:
+    """Apply names (and roles) typed by the user ({speaker id: text}) to the
+    transcripts and the meeting record, and rewrite the run's saved files. No
+    model is run again. Returns {old label: new label}."""
+    before = result.roles
+    changes = speakers_mod.rename_speakers(result.speakers, names, roles)
+    if (changes or result.roles != before) and result.minutes:
+        rename_in_minutes(result.minutes.minutes, changes, result.labels, result.roles)
+    if (changes or result.roles != before) and result.run_dir:
         write_run(result, result.run_dir)
     return changes
 
@@ -243,6 +252,7 @@ def faithfulness_report(result: PipelineResult) -> dict:
     if result.speakers:
         report["speakers_found"] = len(result.speakers)
         report["speakers_named"] = sum(bool(s.name) for s in result.speakers)
+        report["speakers_with_role"] = sum(bool(s.role) for s in result.speakers)
         report["name_claims_proposed"] = len(result.name_evidence)
         report["name_claims_accepted"] = sum(e.accepted for e in result.name_evidence)
     return report

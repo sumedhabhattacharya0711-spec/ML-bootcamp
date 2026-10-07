@@ -21,9 +21,9 @@ STARTS = [10.0 * i for i in range(len(SEGMENTS))]
 EVIDENCE = QuoteIndex(list(enumerate(SEGMENTS[:-1])), STARTS)  # segment 9 is doubtful
 
 
-def decision(text, proposal, agree=(), reject=()):
-    return DecisionEvidence(text=text, proposal_quote=proposal,
-                            agreement_quotes=list(agree), rejection_quotes=list(reject))
+def decision(text, proposal, agree=(), reject=(), settled=""):
+    return DecisionEvidence(text=text, proposal_quote=proposal, agreement_quotes=list(agree),
+                            rejection_quotes=list(reject), settled_quote=settled)
 
 
 def action(task, quote, owner="unspecified", owner_quote="", deadline="unspecified", deadline_quote="",
@@ -316,3 +316,77 @@ def test_label_copied_into_owner_quote_is_not_support():
     result = verify(draft(actions=[a]), TALK_INDEX)
     assert result.minutes.action_items[0].owner == "unspecified"
     assert all(not e.quote.startswith("Rahul:") for e in result.minutes.action_items[0].evidence)
+
+
+# ---------- Roles and uncontested decisions ----------
+
+CHAIR = ["The selling price will be 25 euro.",                              # 0 Betsy
+         "Maybe we should make it waterproof.",                             # 1 Betsy
+         "It has to be shockproof.",                                        # 2 Nick
+         "No, shockproof is too expensive.",                                # 3 Lisa
+         "The industrial designer will prepare the working design.",        # 4 Betsy
+         "And the marketing expert looks at the user requirements.",       # 5 Betsy
+         "Okay."]                                                           # 6 Nick
+CHAIR_WHO = ["Betsy", "Betsy", "Nick", "Lisa", "Betsy", "Betsy", "Nick"]
+ROLES = {"Betsy": "project manager", "Nick": "industrial designer", "Robin": "marketing manager"}
+CHAIR_INDEX = QuoteIndex(list(enumerate(CHAIR)), [10.0 * i for i in range(len(CHAIR))],
+                         CHAIR_WHO, ROLES)
+
+
+def test_settled_and_unchallenged_is_uncontested_not_agreed():
+    d = decision("Price 25 euro", "The selling price will be 25 euro", settled="The selling price will be 25 euro")
+    result = verify(draft([d]), CHAIR_INDEX)
+    dec = result.minutes.decisions[0]
+    assert dec.status == "uncontested" and result.checks["decisions_uncontested"] == 1
+    assert any(e.role == "stated as decided" for e in dec.evidence)
+    assert "**decided, no objection**: Price 25 euro" in to_markdown(result.minutes)
+
+
+def test_hedged_wording_is_not_settled():
+    d = decision("Waterproof", "Maybe we should make it waterproof", settled="Maybe we should make it waterproof")
+    result = verify(draft([d]), CHAIR_INDEX)
+    assert result.minutes.decisions[0].status == "open"
+    assert any("worded as a proposal" in n for n in result.dropped)
+
+
+def test_objection_after_a_settled_statement_wins():
+    d = decision("Shockproof", "It has to be shockproof", settled="It has to be shockproof",
+                 reject=["No, shockproof is too expensive"])
+    assert verify(draft([d]), CHAIR_INDEX).minutes.decisions[0].status == "rejected"
+
+
+def test_task_given_to_a_role_is_owned_by_that_speaker():
+    a = action("Prepare the working design", "The industrial designer will prepare the working design")
+    result = verify(draft(actions=[a]), CHAIR_INDEX)
+    item = result.minutes.action_items[0]
+    assert (item.owner, item.status) == ("Nick", "proposed") and result.checks["owners_from_role"] == 1
+
+
+def test_owner_given_by_name_or_role_is_checked_against_the_role():
+    by_name = action("Prepare the working design", "The industrial designer will prepare the working design",
+                     owner="Nick", owner_quote="The industrial designer will prepare the working design")
+    by_role = action("Prepare the working design", "The industrial designer will prepare the working design",
+                     owner="industrial designer",
+                     owner_quote="The industrial designer will prepare the working design")
+    wrong = action("Prepare the working design", "The industrial designer will prepare the working design",
+                   owner="Betsy", owner_quote="The industrial designer will prepare the working design")
+    owners = [verify(draft(actions=[a]), CHAIR_INDEX).minutes.action_items[0].owner for a in (by_name, by_role, wrong)]
+    assert owners == ["Nick", "Nick", "Nick"]  # Betsy is not supported; the role names Nick
+
+
+def test_role_nobody_holds_names_nobody():
+    a = action("User requirements", "And the marketing expert looks at the user requirements")
+    item = verify(draft(actions=[a]), CHAIR_INDEX).minutes.action_items[0]
+    assert item.owner == "Robin"  # "marketing expert" refers to the marketing manager
+    no_roles = QuoteIndex(list(enumerate(CHAIR)), None, CHAIR_WHO)
+    assert verify(draft(actions=[a]), no_roles).minutes.action_items[0].owner == "unspecified"
+
+
+def test_plain_statements_are_settled_hedges_and_questions_are_not():
+    from meeting_assistant.minutes import is_settled_wording
+    assert is_settled_wording("Selling price is supposed to be 25 euro.")
+    assert is_settled_wording("Profit aim for the company is 50 million euro.")
+    assert is_settled_wording("We'll go with rubber.")
+    assert not is_settled_wording("hopefully should be less than 12.50 euro")
+    assert not is_settled_wording("I think it should be shockproof")
+    assert not is_settled_wording("Is it 25 euro?")

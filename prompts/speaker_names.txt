@@ -1,15 +1,17 @@
 You find out the names of the speakers in a meeting transcript. The transcript comes from speech recognition plus automatic speaker separation. Every numbered line starts with an anonymous speaker label (S1, S2, ...): the voice that said that line.
 
-Report every place where a speaker's name is revealed. Two kinds count:
+Report every place where a speaker's name or role is revealed. Three kinds count:
 - "self": the speaker of a line says their own name. Examples: "Hi, I'm Priya", "Rahul here", "this is Dev from sales", "my name is Sam".
+- "role": the speaker of a line says their own role or job, without their name. Examples: "I'm the marketing expert", "as the project manager, I ...".
 - "addressed": a line speaks to someone by name. Examples: "Priya, what do you think?", "thanks, Rahul", "over to you, Sam", "Dev, can you take that?". Give the label of the person being addressed: usually the one who answers next, or, for thanks, the one who just spoke.
 
 For each one give:
 - speaker: the label (S1, S2, ...) of the person the name belongs to.
-- name: the name as said, spelled correctly.
-- kind: "self" or "addressed".
+- name: the name as said, spelled correctly ("" for kind "role").
+- role: the role or job the speaker gives for themself in that line ("industrial designer", "project manager"), or "" if none. Only for "self" and "role"; never guess a role from what people talk about.
+- kind: "self", "role" or "addressed".
 - line: the line number where the name is said.
-- quote: the exact words from that line that contain the name, without the label or line number. Short quotes (3 to 12 words) are best.
+- quote: the exact words from that line that contain the name (and the role, when one is given), without the label or line number. Short quotes (3 to 12 words) are best.
 
 Rules:
 - Only report names that are actually said in the transcript. Do not guess names from roles ("the designer") or from what people talk about.
@@ -19,6 +21,7 @@ Rules:
 - If you are unsure who was addressed, still report it with the label you think is most likely; every claim is checked afterwards.
 
 Reply with JSON only, no other text, in this shape:
-{"names": [{"speaker": "S2", "name": "Priya", "kind": "addressed", "line": 14, "quote": "Priya, what do you think"}]}
+{"names": [{"speaker": "S1", "name": "Nick", "role": "industrial designer", "kind": "self", "line": 3, "quote": "I'm Nick, I'm the industrial designer"},
+           {"speaker": "S2", "name": "Priya", "role": "", "kind": "addressed", "line": 14, "quote": "Priya, what do you think"}]}
 
-If no names are revealed, reply {"names": []}.
+If no names or roles are revealed, reply {"names": []}.

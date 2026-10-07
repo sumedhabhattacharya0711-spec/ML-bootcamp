@@ -42,7 +42,7 @@ def fake_structured(system, user, schema):
     return MinutesDraft(summary="Short meeting.", minutes=["Training jobs"], action_items=[], open_questions=[],
                         decisions=[DecisionEvidence(text="Keep it", proposal_quote="I propose we keep it",
                                                     agreement_quotes=["Yes, let's keep it"],
-                                                    rejection_quotes=[])])
+                                                    rejection_quotes=[], settled_quote="")])
 
 
 def failing_llm(system, user):
@@ -156,7 +156,8 @@ def talk_structured(system, user, schema):
     return MinutesDraft(
         summary="Rahul will send the report.", minutes=["Keeping it"], open_questions=[],
         decisions=[DecisionEvidence(text="Keep it", proposal_quote="I propose we keep it",
-                                    agreement_quotes=["Yes, let's keep it"], rejection_quotes=[])],
+                                    agreement_quotes=["Yes, let's keep it"], rejection_quotes=[],
+                                    settled_quote="")],
         action_items=[ActionItemEvidence(task="Send the report", task_quote="can you send the report",
                                          owner="unspecified", owner_quote="", deadline="by Friday",
                                          deadline_quote="I'll send it by Friday",

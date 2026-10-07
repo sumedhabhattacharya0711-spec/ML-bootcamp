@@ -58,6 +58,11 @@ SELF_POINTS = 3       # "I'm Priya": the speaker says it themself, strong eviden
 ADDRESSED_POINTS = 1  # "Priya, what do you think?" + Priya answers: weaker, adds up
 HIGH_CONFIDENCE = 2   # points needed for a "high" confidence name
 
+# Generic words in a role ("industrial designer"): the other words tell roles apart.
+ROLE_NOUNS = {"designer", "manager", "expert", "specialist", "lead", "leader", "person", "officer",
+              "engineer", "developer", "analyst", "director", "head", "owner", "coordinator"}
+ROLE_FILLER = {"the", "a", "an", "our", "your", "of", "for", "and", "in", "charge", "team"}
+
 # Words people are addressed with that are not names ("thanks, everyone").
 NOT_NAMES = {
     "all", "everyone", "everybody", "guys", "team", "folks", "people", "sir", "madam", "maam",
@@ -289,6 +294,8 @@ class Speaker:
     note: str = ""        # why a speaker stayed unnamed, e.g. two equally likely names
     talk_s: float = 0.0
     lines: int = 0
+    role: str = ""        # e.g. "industrial designer", from what the speaker said about themself
+    role_source: str = "" # "self" (said it themself) or "edited"
 
     @property
     def label(self) -> str:
@@ -324,7 +331,8 @@ class NameEvidence:
     """One place in the transcript where the LLM saw a speaker's name."""
     speaker: str    # who the claim says it is ("S2")
     name: str
-    kind: str       # "self" (they said their own name) or "addressed" (someone said it to them)
+    kind: str       # "self" (they said their own name), "addressed" (someone said it to them)
+                    # or "role" (they said their own role; `name` then holds the role)
     line: int
     quote: str
     accepted: bool = False
@@ -398,19 +406,32 @@ def check_claim(claim: dict, lines: list[str], line_speakers: list[str | None],
 
     if speaker not in set(filter(None, line_speakers)):
         return reject(f"unknown speaker label {speaker!r}")
-    if not name or _norm(name) in NOT_NAMES or not re.search(r"[A-Za-z]", name):
+    if kind == "role":
+        name = clean_role(name)
+        ev.name = name
+        if not role_words(name):
+            return reject("not a role")
+    elif not name or _norm(name) in NOT_NAMES or not re.search(r"[A-Za-z]", name):
         return reject("not a person's name")
-    if kind not in ("self", "addressed"):
+    if kind not in ("self", "addressed", "role"):
         return reject(f"unknown kind {kind!r}")
     found = _locate(quote, line, lines, doubtful)
     if found is None:
         return reject("quote not found in the transcript")
     ev.line = found
     quote_words = set(_norm(quote).split())
-    if not any(w in quote_words for w in _norm(name).split() if len(w) >= 2):
+    needed = role_words(name) if kind == "role" else [w for w in _norm(name).split() if len(w) >= 2]
+    if kind == "role" and not all(w in quote_words for w in needed):
+        return reject("the quote does not contain the role")
+    if kind != "role" and not any(w in quote_words for w in needed):
         return reject("the quote does not contain the name")
 
     said_by = line_speakers[found]
+    if kind == "role":
+        if said_by != speaker:
+            return reject(f"said by {said_by}, not by {speaker}")
+        ev.accepted, ev.reason = True, "said their own role"
+        return ev
     if kind == "self":
         if said_by != speaker:
             return reject(f"said by {said_by}, not by {speaker}")
@@ -424,6 +445,58 @@ def check_claim(claim: dict, lines: list[str], line_speakers: list[str | None],
         ev.reason = f"addressed by {said_by}; {speaker} {how}"
     ev.name, ev.accepted = _canonical(name, attendees), True
     return ev
+
+
+def clean_role(role: str) -> str:
+    """ "The Industrial Designer." -> "industrial designer"."""
+    words = _norm(role).split()
+    while words and words[0] in ROLE_FILLER:
+        words.pop(0)
+    return " ".join(words)
+
+
+def role_words(role: str) -> list[str]:
+    """The words of a role that matter ("user interface designer" -> user, interface, designer)."""
+    return [w for w in _norm(role).split() if w not in ROLE_FILLER]
+
+
+def role_mentioned(role: str, text: str) -> bool:
+    """True if `text` refers to this role: the whole role ("the industrial designer"),
+    or its distinctive word followed by a role noun ("the marketing expert" for a
+    "marketing manager"). A distinctive word alone ("the project") is not enough."""
+    words = _norm(text).split()
+    joined = f" {' '.join(words)} "
+    if role and f" {_norm(role)} " in joined:
+        return True
+    distinctive = [w for w in role_words(role) if w not in ROLE_NOUNS]
+    for i, w in enumerate(words):
+        if w in distinctive and any(x in ROLE_NOUNS for x in words[i + 1:i + 3]):
+            return True
+    return False
+
+
+def assign_roles(speakers: list[Speaker], evidence: list[NameEvidence]) -> None:
+    """Each speaker gets the role they said most often about themself, one role
+    per speaker and one speaker per role. Roles the user typed are kept."""
+    points: Counter = Counter()
+    for e in evidence:
+        if e.accepted and e.kind == "role":
+            points[(e.speaker, e.name)] += 1
+    for s in speakers:
+        if s.role_source != "edited":
+            s.role, s.role_source = "", ""
+    done = {s.id for s in speakers if s.role_source == "edited"}
+    taken = {s.role for s in speakers if s.role_source == "edited"}
+    by_id = {s.id: s for s in speakers}
+    for (sid, role), score in sorted(points.items(), key=lambda kv: (-kv[1], kv[0])):
+        if sid in done or role in taken or sid not in by_id:
+            continue
+        if any(p == score for (s2, r2), p in points.items() if s2 == sid and r2 != role and r2 not in taken):
+            done.add(sid)  # two roles equally likely: leave it to the user
+            continue
+        by_id[sid].role, by_id[sid].role_source = role, "self"
+        done.add(sid)
+        taken.add(role)
 
 
 def _full_names(names: list[str]) -> dict[str, str]:
@@ -445,9 +518,9 @@ def assign_names(speakers: list[Speaker], evidence: list[NameEvidence]) -> None:
     points: Counter = Counter()
     kinds: dict[tuple[str, str], set[str]] = {}
     spelling: dict[str, str] = {}
-    full = _full_names([e.name for e in evidence if e.accepted])
+    full = _full_names([e.name for e in evidence if e.accepted and e.kind != "role"])
     for e in evidence:
-        if not e.accepted:
+        if not e.accepted or e.kind == "role":
             continue
         e.name = full.get(_norm(e.name), e.name)
         key = (e.speaker, _norm(e.name))
@@ -508,6 +581,14 @@ def name_speakers(lines: list[str], line_speakers: list[str | None], speakers: l
             raise LLMError('LLM reply is missing the "names" list')
         claims += [c for c in items if isinstance(c, dict)]
 
+    # A self-introduction can carry a role ("I'm Nick, the industrial designer"),
+    # and a role can be said without a name: each role becomes a claim of its own.
+    for claim in list(claims):
+        role = str(claim.get("role") or "").strip()
+        if role and str(claim.get("kind", "")).strip().lower() in ("self", "role"):
+            claims.append(dict(claim, name=role, kind="role"))
+    claims = [c for c in claims if str(c.get("name") or "").strip()]
+
     evidence, seen = [], set()
     for claim in claims:
         ev = check_claim(claim, lines, line_speakers, doubtful, attendees)
@@ -516,16 +597,24 @@ def name_speakers(lines: list[str], line_speakers: list[str | None], speakers: l
             seen.add(key)
             evidence.append(ev)
     assign_names(speakers, evidence)
+    assign_roles(speakers, evidence)
     return evidence
 
 
 # ---------- Editing names ----------
 
-def rename_speakers(speakers: list[Speaker], names: dict[str, str]) -> dict[str, str]:
-    """Set the names a user typed ({speaker id: name}; "" = back to "Speaker N").
+def rename_speakers(speakers: list[Speaker], names: dict[str, str],
+                    roles: dict[str, str] | None = None) -> dict[str, str]:
+    """Set the names a user typed ({speaker id: name}; "" = back to "Speaker N"),
+    and optionally roles ({speaker id: role}; "" = no role).
     Returns {old label: new label} for every label that changed. Giving two
     speakers the same name is allowed: it is how a user merges one person whom
     diarization split in two."""
+    for s in speakers:
+        if roles and s.id in roles:
+            new_role = clean_role(str(roles[s.id] or ""))
+            if new_role != s.role:
+                s.role, s.role_source = new_role, ("edited" if new_role else "")
     changes = {}
     for s in speakers:
         if s.id not in names:

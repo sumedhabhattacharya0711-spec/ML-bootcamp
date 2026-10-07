@@ -122,7 +122,8 @@ HEADER_HTML = """
 """
 SAVED_FILES = ["minutes.md", "minutes.json", "transcript_raw.txt", "transcript_refined.txt",
                "speakers.json", "edit_log.json", "run.json"]
-SPEAKER_HEADERS = ["ID", "Name (edit me)", "Found from", "Confidence", "Talk time", "Lines", "Note"]
+SPEAKER_HEADERS = ["ID", "Name (edit me)", "Role (edit me)", "Found from", "Confidence", "Talk time", "Lines",
+                   "Note"]
 
 
 class WhisperModels:
@@ -261,7 +262,10 @@ def conversation_html(result: PipelineResult) -> str:
         return "<p><em>Speakers unknown: see the Stage 1a status above.</em></p>"
     colours, labels = speaker_colours(result), result.labels
     doubtful = {f.index for f in result.flags if f.flagged}
-    legend = "".join(f'<span style="--c:{c}">{html.escape(label)}</span>' for label, c in colours.items())
+    roles = result.roles
+    legend = "".join(f'<span style="--c:{c}">{html.escape(label)}'
+                     f'{html.escape(f" · {roles[label]}") if roles.get(label) else ""}</span>'
+                     for label, c in colours.items())
     turns, current = [], None
     for i, (seg, text) in enumerate(zip(result.segments, result.lines())):
         label = labels[i] or "(no speaker)"
@@ -283,7 +287,7 @@ def speaker_rows(result: PipelineResult) -> list[list]:
     for s in result.speakers:
         found = {"self-introduction": "said their own name", "addressed": "addressed by name",
                  "edited": "typed by you"}.get(s.source, "not named")
-        rows.append([s.id, s.label, found, s.confidence, format_timestamp(s.talk_s), s.lines, s.note])
+        rows.append([s.id, s.label, s.role, found, s.confidence, format_timestamp(s.talk_s), s.lines, s.note])
     return rows
 
 
@@ -334,6 +338,9 @@ FAITHFULNESS_LABELS = {
     "owners_from_speaker": "Owners set from the speaker who volunteered (\"I'll do it\")",
     "speakers_found": "Speakers found by diarization",
     "speakers_named": "Speakers named from the transcript (or by you)",
+    "speakers_with_role": "Speakers with a role they stated (or you typed)",
+    "owners_from_role": "Owners set from the role a task was given to (\"the designer will ...\")",
+    "decisions_uncontested": "Decisions stated as settled with no objection (not explicitly agreed)",
     "name_claims_proposed": "Name claims proposed by the LLM",
     "name_claims_accepted": "Name claims accepted by the checks",
 }
@@ -443,9 +450,10 @@ def apply_names(result: PipelineResult | None, table):
         return [gr.update()] * 8 + ["_Run a recording with speaker diarization first._"]
     rows = table.values.tolist() if hasattr(table, "values") else (table or [])
     names = {str(row[0]): "" if row[1] is None else str(row[1]) for row in rows if row and row[0]}
-    changes = rename_speakers(result, names)
+    roles = {str(row[0]): "" if row[2] is None else str(row[2]) for row in rows if row and row[0]}
+    changes = rename_speakers(result, names, roles)
     note = ("Renamed: " + "; ".join(f"{old} → {new}" for old, new in changes.items()) + ". Saved files updated."
-            if changes else "No names changed.")
+            if changes else "Names unchanged; roles and saved files updated.")
     record, _ = minutes_view(result)
     saved = json.loads((result.run_dir / "run.json").read_text(encoding="utf-8")) if result.run_dir else {}
     return [speaker_rows(result), conversation_html(result), record, raw_highlights(result),
@@ -493,12 +501,12 @@ def build_ui(default_size: str) -> gr.Blocks:
             faith = gr.Dataframe(headers=["Faithfulness check", "Value"], interactive=False, wrap=True,
                                  label="Faithfulness report (counts from this run's verification)")
         with gr.Tab("Speakers"):
-            gr.Markdown("Each colour is one voice. Edit a name in the table and press **Apply names**: the "
+            gr.Markdown("Each colour is one voice. Edit a name or role in the table and press **Apply names**: the "
                         "transcripts, the meeting record and the saved files are updated without running "
                         "any model again. Giving two speakers the same name merges them. Clear a name to go "
                         "back to \"Speaker N\".")
             speakers_table = gr.Dataframe(headers=SPEAKER_HEADERS, label="Speakers", interactive=True,
-                                          static_columns=[0, 2, 3, 4, 5, 6], wrap=True)
+                                          static_columns=[0, 3, 4, 5, 6, 7], wrap=True)
             with gr.Row():
                 apply_btn = gr.Button("Apply names", variant="primary", scale=0)
                 rename_note = gr.Markdown()

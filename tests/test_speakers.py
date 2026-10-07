@@ -211,3 +211,72 @@ def test_first_name_and_full_name_count_as_one_person():
     speakers = [Speaker("S1")]
     assign_names(speakers, [ev("S1", "Bart", "self"), ev("S1", "Bart Beute", "self"), ev("S1", "Richard", "self")])
     assert speakers[0].name == "Bart Beute" and speakers[0].confidence == "high"
+
+
+# ---------- Roles ----------
+
+from meeting_assistant.speakers import assign_roles, clean_role, role_mentioned  # noqa: E402
+
+INTRO = ["I'm Nick, I'm the industrial designer.",   # 0 S1
+         "And I'm the marketing expert.",            # 1 S2
+         "The industrial designer will do the working design."]  # 2 S3
+INTRO_WHO = ["S1", "S2", "S3"]
+
+
+def role_claim(speaker, role, line, quote, kind="role", name=""):
+    return {"speaker": speaker, "name": role if kind == "role" else name, "kind": kind, "line": line,
+            "quote": quote}
+
+
+def test_role_said_by_the_speaker_is_accepted():
+    ev = check_claim(role_claim("S2", "the Marketing Expert", 1, "I'm the marketing expert"),
+                     INTRO, INTRO_WHO, set(), [])
+    assert ev.accepted and ev.name == "marketing expert"
+
+
+def test_role_said_about_someone_else_is_rejected():
+    ev = check_claim(role_claim("S1", "industrial designer", 2, "The industrial designer will do"),
+                     INTRO, INTRO_WHO, set(), [])
+    assert not ev.accepted and "said by S3" in ev.reason
+
+
+def test_role_not_in_the_quote_is_rejected():
+    ev = check_claim(role_claim("S1", "project manager", 0, "I'm Nick, I'm the industrial designer"),
+                     INTRO, INTRO_WHO, set(), [])
+    assert not ev.accepted and "does not contain the role" in ev.reason
+
+
+def test_name_speakers_finds_names_and_roles_from_one_introduction():
+    import json
+
+    def fake_llm(system, user):
+        return json.dumps({"names": [
+            {"speaker": "S1", "name": "Nick", "role": "industrial designer", "kind": "self", "line": 0,
+             "quote": "I'm Nick, I'm the industrial designer"},
+            {"speaker": "S2", "name": "", "role": "marketing expert", "kind": "role", "line": 1,
+             "quote": "I'm the marketing expert"}]})
+
+    speakers = summarize([seg(t, i, i + 1, w) for i, (t, w) in enumerate(zip(INTRO, INTRO_WHO))])
+    name_speakers(INTRO, INTRO_WHO, speakers, fake_llm)
+    assert [(s.label, s.role) for s in speakers] == [("Nick", "industrial designer"),
+                                                    ("Speaker 2", "marketing expert"), ("Speaker 3", "")]
+
+
+def test_one_role_per_speaker_and_edited_roles_kept():
+    speakers = [Speaker("S1"), Speaker("S2", role="designer", role_source="edited")]
+    assign_roles(speakers, [ev("S1", "project manager", "role"), ev("S1", "project manager", "role"),
+                            ev("S1", "designer", "role"), ev("S2", "project manager", "role")])
+    assert [s.role for s in speakers] == ["project manager", "designer"]
+
+
+def test_role_mentions():
+    assert role_mentioned("industrial designer", "The industrial designer will do the working design")
+    assert role_mentioned("marketing manager", "and the marketing expert prepares the requirements")
+    assert not role_mentioned("project manager", "the project will start next week")
+    assert clean_role("The User Interface Designer.") == "user interface designer"
+
+
+def test_roles_can_be_edited():
+    speakers = [Speaker("S1", "Nick", role="industrial designer", role_source="self")]
+    rename_speakers(speakers, {"S1": "Nick"}, {"S1": "Lead Designer"})
+    assert (speakers[0].role, speakers[0].role_source) == ("lead designer", "edited")

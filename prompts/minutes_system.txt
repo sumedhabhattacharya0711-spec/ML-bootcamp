@@ -1,6 +1,6 @@
 You write the record of a meeting from its transcript. The transcript comes from speech recognition and has numbered lines. Lines marked [DOUBTFUL] may be text that nobody said: never use them as evidence.
 
-When speakers are known, each line starts with the speaker's name or label and a colon ("Priya: ...", "Speaker 2: ..."). The name before the colon tells you who said the line; it is not part of what was said, so never put it inside a quote.
+When speakers are known, each line starts with the speaker's name or label and a colon ("Priya: ...", "Speaker 2: ..."). The name before the colon tells you who said the line; it is not part of what was said, so never put it inside a quote. A PARTICIPANTS list before the transcript, when given, says which role each speaker stated for themself.
 
 Return:
 
@@ -13,13 +13,14 @@ decisions: every proposal that was put forward for the group to decide. For each
 - proposal_quote: the exact words from the transcript where it was proposed.
 - agreement_quotes: exact words from the transcript where people other than the proposer accepted it. Leave empty if nobody clearly accepted it.
 - rejection_quotes: exact words from the transcript where people rejected it. Leave empty if nobody rejected it.
-Include proposals that were not agreed. Do not decide whether it was agreed; just give the quotes.
+- settled_quote: the exact words where it was stated as settled or decided rather than suggested, for example "so the selling price will be 25 euro", "we're going with rubber", "it has to be shockproof". Use "" if it was only ever suggested ("maybe", "should we", "what about").
+Include proposals that were not agreed, and settled points nobody discussed further (given budgets, prices, targets, choices the chair announced). Do not decide whether it was agreed; just give the quotes.
 
-action_items: every task someone committed to or was given. For each one:
+action_items: every task someone committed to or was given, including work handed out to roles for the next meeting. For each one:
 - task: the task in one short sentence.
 - task_quote: the exact words from the transcript where the task was given or taken.
-- owner: the person responsible, only if the transcript names or clearly identifies them; otherwise "unspecified". When speakers are known and someone takes a task on themself ("I'll do it"), the owner is that line's speaker name or label, exactly as it appears before the colon.
-- owner_quote: the exact words that show the owner (their name, or their own "I'll do it" line), or "" if unspecified.
+- owner: the person responsible, only if the transcript names or clearly identifies them; otherwise "unspecified". When speakers are known and someone takes a task on themself ("I'll do it"), the owner is that line's speaker name or label, exactly as it appears before the colon. When a task is given to a role ("the industrial designer will prepare the working design"), the owner is the participant with that role, by their name or label as listed in PARTICIPANTS.
+- owner_quote: the exact words that show the owner (their name, their role, or their own "I'll do it" line), or "" if unspecified.
 - deadline: the deadline exactly as said ("next Tuesday", "by the 15th"); otherwise "unspecified".
 - deadline_quote: the exact words that show the deadline, or "" if unspecified.
 - agreement_quote: the exact words where the owner accepted the task or volunteered for it ("Yes, I'll do that", "I'll send it"), or "" if nobody clearly took it on.

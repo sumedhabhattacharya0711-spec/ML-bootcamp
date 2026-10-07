@@ -12,7 +12,13 @@ supports them. Lines flagged as possible hallucinations are marked
 When the speakers are known (speakers.py), every line is shown with its
 speaker and every quote knows who said it. Then an agreement counts only if
 someone other than the proposer said it, and "I'll do it" makes its speaker
-the owner of the task.
+the owner of the task. When speakers stated their roles, a task given to a
+role ("the industrial designer will ...") is owned by the speaker with that role.
+
+A proposal that nobody explicitly agreed to can still be "uncontested": it
+was stated as settled ("so the selling price will be 25 euro", not "maybe we
+should ...") and no verified objection came after it. It is shown as
+"decided, no objection", never as "agreed".
 
 Try it:  python -m meeting_assistant.minutes data/audio/ES2004a.wav
 """
@@ -45,6 +51,12 @@ SAME_ITEM_SCORE = 85  # rapidfuzz.token_set_ratio at which items from two parts 
 VOLUNTEER = re.compile(r"\b(i ll|i will|i shall|i can(?! t\b)|i m going to|i am going to|i m gonna|let me|"
                        r"leave it (to|with) me|i ll take|i ve got (it|this))\b")
 
+# Hedged wording is a proposal, never a settled decision (matched on normalised
+# text, where "don't" is "don t"). Plain statements ("the selling price is 25
+# euro", "we'll go with rubber") are settled.
+HEDGES = re.compile(r"\b(maybe|perhaps|might|could|should we|shall we|what about|how about|what if|"
+                    r"i think|i guess|i don t know|probably|not sure|hopefully|or something|wondering)\b")
+
 # A quote that is ONLY one of these is a backchannel, not agreement.
 BACKCHANNELS = {"mm hmm", "mhm", "mm", "uh huh", "hmm", "yeah", "yep", "yes", "okay", "ok",
                 "right", "sure", "alright", "all right"}
@@ -57,6 +69,7 @@ class DecisionEvidence(BaseModel):
     proposal_quote: str
     agreement_quotes: list[str]
     rejection_quotes: list[str]
+    settled_quote: str  # where it was stated as decided ("the price will be 25 euro"), or ""
 
 
 class ActionItemEvidence(BaseModel):
@@ -94,7 +107,7 @@ class Evidence(BaseModel):
 
 class Decision(BaseModel):
     text: str
-    status: Literal["agreed", "rejected", "open"]
+    status: Literal["agreed", "uncontested", "rejected", "open"]
     quote: str  # the proposal quote
     evidence: list[Evidence] = []
 
@@ -121,6 +134,7 @@ class Minutes(BaseModel):
     action_items: list[ActionItem]
     open_questions: list[OpenQuestion] = []
     participants: list[str] = []  # speaker names, when speakers are known
+    roles: dict[str, str] = {}    # speaker name -> role they stated ("industrial designer")
 
 
 @dataclass
@@ -141,8 +155,9 @@ class QuoteIndex:
     string, with a map from character positions back to segment lines."""
 
     def __init__(self, lines: list[tuple[int, str]], starts: list[float] | None = None,
-                 speakers: list[str | None] | None = None):
+                 speakers: list[str | None] | None = None, roles: dict[str, str] | None = None):
         self.speakers = speakers  # speaker label of each segment line, or None
+        self.roles = roles or {}  # speaker label -> stated role
         self.line_ids, self.offsets, parts, pos = [], [], [], 0
         for line, text in lines:
             norm = _norm(text)
@@ -221,10 +236,33 @@ def decide_status(d: DecisionEvidence, index: QuoteIndex,
             bucket.append(pos)
             evidence.append(index.evidence(kind, q, pos))
 
-    if not agreements and not rejections:
-        return "open", evidence, notes
     latest_agreement, latest_rejection = max(agreements, default=-1), max(rejections, default=-1)
-    return ("agreed" if latest_agreement > latest_rejection else "rejected"), evidence, notes
+    if agreements and latest_agreement > latest_rejection:
+        return "agreed", evidence, notes
+    settled = _settled(d, index, notes)
+    if settled is not None and settled > latest_rejection:
+        evidence.append(index.evidence("stated as decided", d.settled_quote, settled))
+        return "uncontested", evidence, notes
+    return ("rejected" if rejections else "open"), evidence, notes
+
+
+def is_settled_wording(quote: str) -> bool:
+    """ "So the selling price is 25 euro." yes; "Maybe it should be 25?" no."""
+    return bool(_norm(quote)) and not HEDGES.search(_norm(quote)) and "?" not in quote
+
+
+def _settled(d: DecisionEvidence, index: QuoteIndex, notes: list[str]) -> int | None:
+    """Position of a verified quote stating the decision as settled, or None."""
+    quote = (d.settled_quote or "").strip()
+    if not quote:
+        return None
+    if not is_settled_wording(quote):
+        notes.append(f'"{d.text}": "stated as decided" quote is worded as a proposal, ignored: "{quote}"')
+        return None
+    pos = index.find(quote)
+    if pos is None:
+        notes.append(f'"{d.text}": "stated as decided" quote not found in transcript, ignored: "{quote}"')
+    return pos
 
 
 def _supported(value: str, quote: str, index: QuoteIndex) -> int | None:
@@ -242,7 +280,8 @@ def verify(draft: MinutesDraft, index: QuoteIndex) -> MinutesResult:
     checks = dict(decisions_proposed=len(draft.decisions), decisions_kept=0, decisions_agreed=0,
                   actions_proposed=len(draft.action_items), actions_kept=0, actions_agreed=0,
                   open_questions_proposed=len(draft.open_questions), open_questions_kept=0,
-                  owners_removed=0, deadlines_removed=0, quotes_ignored=0, owners_from_speaker=0)
+                  owners_removed=0, deadlines_removed=0, quotes_ignored=0, owners_from_speaker=0,
+                  owners_from_role=0, decisions_uncontested=0)
 
     decisions = []
     for d in draft.decisions:
@@ -269,7 +308,14 @@ def verify(draft: MinutesDraft, index: QuoteIndex) -> MinutesResult:
             found = _supported(value, quote, index)
             if found is None and name == "owner":
                 found = _volunteered(value, quote, index)
+            if found is None and name == "owner":
+                label, found = _role_owner(value, quote, index)
+                if found is not None:
+                    value = label
+                    checks["owners_from_role"] += 1
             if found is not None:
+                if name == "owner":
+                    value = _role_holder(value, index) or value  # "industrial designer" -> "Nick"
                 checked[name] = value
                 evidence.append(index.evidence(name, quote, found))
                 continue
@@ -278,14 +324,17 @@ def verify(draft: MinutesDraft, index: QuoteIndex) -> MinutesResult:
                 dropped.append(f'"{a.task}": {name} "{value}" not supported by a quote, set to unspecified')
                 checks[f"{name}s_removed"] += 1
         if checked["owner"] == "unspecified":
-            owner, found, quote = _owner_from_speaker(a, index)
-            if owner:
-                checked["owner"] = owner
-                evidence.append(index.evidence("owner", quote, found))
-                checks["owners_from_speaker"] += 1
-                if a.owner.strip().lower() != "unspecified":  # it was counted as removed above
-                    checks["owners_removed"] -= 1
-                dropped.append(f'"{a.task}": owner set to {owner}, who volunteered: "{quote}"')
+            for finder, how, counter in ((_owner_from_speaker, "who volunteered", "owners_from_speaker"),
+                                         (_owner_from_role, "whose role the task was given to", "owners_from_role")):
+                owner, found, quote = finder(a, index)
+                if owner:
+                    checked["owner"] = owner
+                    evidence.append(index.evidence("owner", quote, found))
+                    checks[counter] += 1
+                    if a.owner.strip().lower() != "unspecified":  # it was counted as removed above
+                        checks["owners_removed"] -= 1
+                    dropped.append(f'"{a.task}": owner set to {owner}, {how}: "{quote}"')
+                    break
         status = _action_status(a, checked["owner"], index, evidence, dropped)
         actions.append(ActionItem(task=a.task, quote=a.task_quote, status=status,
                                   evidence=_unique(evidence), **checked))
@@ -302,6 +351,7 @@ def verify(draft: MinutesDraft, index: QuoteIndex) -> MinutesResult:
     checks["decisions_kept"] = len(decisions)
     checks["open_questions_kept"] = len(questions)
     checks["decisions_agreed"] = sum(d.status == "agreed" for d in decisions)
+    checks["decisions_uncontested"] = sum(d.status == "uncontested" for d in decisions)
     checks["actions_kept"] = len(actions)
     checks["actions_agreed"] = sum(a.status == "agreed" for a in actions)
     minutes = Minutes(summary=draft.summary, minutes=draft.minutes,
@@ -320,6 +370,53 @@ def _volunteered(owner: str, quote: str, index: QuoteIndex) -> int | None:
     if pos is None or not _same_person(index.speaker_at(pos), owner):
         return None
     return pos
+
+
+def _role_holder(owner: str, index: QuoteIndex) -> str | None:
+    """The speaker label holding the role `owner` names, if `owner` is a role
+    rather than a speaker (and exactly one speaker has that role)."""
+    from meeting_assistant.speakers import role_mentioned
+
+    if not index.roles or any(_same_person(lb, owner) for lb in index.speakers or []):
+        return None
+    matches = [lb for lb, role in index.roles.items() if role_mentioned(role, owner)]
+    return matches[0] if len(matches) == 1 else None
+
+
+def _role_owner(owner: str, quote: str, index: QuoteIndex) -> tuple[str | None, int | None]:
+    """(speaker label, quote position) when the quote gives the task to the
+    owner's role ("the industrial designer will ..."). `owner` may be the
+    speaker's name or the role itself."""
+    from meeting_assistant.speakers import role_mentioned
+
+    if not index.roles or not owner or owner.strip().lower() == "unspecified" or not quote:
+        return None, None
+    label = next((lb for lb in index.roles if _same_person(lb, owner)), None)
+    if label is None:  # the LLM gave the role itself as owner
+        matches = [lb for lb, role in index.roles.items() if role_mentioned(role, owner)]
+        label = matches[0] if len(matches) == 1 else None
+    if label is None or not role_mentioned(index.roles[label], index._without_label(quote)):
+        return None, None
+    pos = index.find(quote)
+    return (label, pos) if pos is not None else (None, None)
+
+
+def _owner_from_role(a: ActionItemEvidence, index: QuoteIndex) -> tuple[str | None, int | None, str]:
+    """When no owner is supported, a verified quote that gives the task to
+    exactly one speaker's role ("the marketing expert will ...") names its owner."""
+    from meeting_assistant.speakers import role_mentioned
+
+    for quote in (a.owner_quote, a.task_quote):
+        if not quote or not index.roles:
+            continue
+        text = index._without_label(quote)
+        matches = [lb for lb, role in index.roles.items() if role_mentioned(role, text)]
+        if len(matches) != 1:
+            continue
+        pos = index.find(quote)
+        if pos is not None:
+            return matches[0], pos, quote
+    return None, None, ""
 
 
 def _owner_from_speaker(a: ActionItemEvidence, index: QuoteIndex) -> tuple[str | None, int | None, str]:
@@ -399,10 +496,11 @@ def format_transcript(segment_texts: list[str], doubtful: set[int] | None = None
 def write_minutes(segment_texts: list[str], call_structured, doubtful: set[int] | None = None,
                   starts: list[float] | None = None, prompt_path: Path = PROMPT_PATH,
                   call_text=None, max_tokens: int | None = None,
-                  speakers: list[str | None] | None = None) -> MinutesResult:
+                  speakers: list[str | None] | None = None, roles: dict[str, str] | None = None) -> MinutesResult:
     """Stage 3. `call_structured` is llm.call_llm_structured (or a fake in tests);
     `starts` are the segments' start times, used to timestamp the evidence;
-    `speakers` the speaker label of each segment, when known.
+    `speakers` the speaker label of each segment, when known; `roles` the
+    roles speakers stated ({label: role}).
 
     Long transcripts are split into topic parts (segment.py). Each part is one
     call that also sees the summaries of the earlier parts as context (recursive
@@ -413,18 +511,23 @@ def write_minutes(segment_texts: list[str], call_structured, doubtful: set[int] 
     for_llm, evidence = format_transcript(segment_texts, doubtful, speakers)
     system = prompt_path.read_text(encoding="utf-8")
     lines = for_llm.split("\n")
+    roles = {label: role for label, role in (roles or {}).items() if role}
+    header = ("PARTICIPANTS (roles as they stated them):\n" +
+              "\n".join(f"- {label}: {role}" for label, role in roles.items()) + "\n\nTRANSCRIPT:\n"
+              if roles else "")
     parts = split_segments(lines, max_tokens or SEGMENT_MAX_TOKENS)
     if len(parts) == 1:
-        draft = call_structured(system, for_llm, MinutesDraft)
+        draft = call_structured(system, header + for_llm, MinutesDraft)
     else:
         drafts = []
         for k, (a, b) in enumerate(parts):
             user = _part_message(k, len(parts), [d.summary for d in drafts], lines[a:b])
-            drafts.append(call_structured(system, user, MinutesDraft))
+            drafts.append(call_structured(system, header + user, MinutesDraft))
         draft = merge_drafts(drafts, call_text)
-    result = verify(draft, QuoteIndex(evidence, starts, speakers))
+    result = verify(draft, QuoteIndex(evidence, starts, speakers, roles))
     if speakers:
         result.minutes.participants = list(dict.fromkeys(s for s in speakers if s))
+        result.minutes.roles = {p: roles[p] for p in result.minutes.participants if p in roles}
     result.checks["parts"] = len(parts)
     return result
 
@@ -479,6 +582,7 @@ def merge_drafts(drafts: list[MinutesDraft], call_text=None) -> MinutesDraft:
             else:
                 match.agreement_quotes = _union(match.agreement_quotes, dec.agreement_quotes)
                 match.rejection_quotes = _union(match.rejection_quotes, dec.rejection_quotes)
+                match.settled_quote = match.settled_quote or dec.settled_quote
         for act in d.action_items:
             match = next((x for x in actions if _same(x.task, act.task)), None)
             if match is None:
@@ -508,12 +612,14 @@ def _evidence_lines(evidence: list[Evidence]) -> list[str]:
 def to_markdown(m: Minutes) -> str:
     lines = ["# Meeting record", ""]
     if m.participants:
-        lines += ["## Participants", "", ", ".join(m.participants), ""]
+        lines += ["## Participants", "", ", ".join(f"{p} ({m.roles[p]})" if m.roles.get(p) else p
+                                                 for p in m.participants), ""]
     lines += ["## Summary", "", m.summary, "", "## Minutes", ""]
     lines += [f"- {item}" for item in m.minutes] or ["- (none)"]
     lines += ["", "## Decisions", ""]
     for d in m.decisions:
-        lines += [f"- **{d.status}**: {d.text}"] + _evidence_lines(d.evidence)
+        status = "decided, no objection" if d.status == "uncontested" else d.status
+        lines += [f"- **{status}**: {d.text}"] + _evidence_lines(d.evidence)
     if not m.decisions:
         lines.append("- (none)")
     lines += ["", "## Action items", ""]
@@ -534,7 +640,8 @@ def to_json(m: Minutes) -> str:
     return m.model_dump_json(indent=2)
 
 
-def rename_in_minutes(m: Minutes, changes: dict[str, str], line_speakers: list[str | None]) -> None:
+def rename_in_minutes(m: Minutes, changes: dict[str, str], line_speakers: list[str | None],
+                      roles: dict[str, str] | None = None) -> None:
     """Apply edited speaker names to a finished record in place, without asking
     the LLM again. `changes` is {old label: new label} (speakers.rename_speakers);
     `line_speakers` the new label of each transcript line. Quotes stay word for
@@ -544,6 +651,8 @@ def rename_in_minutes(m: Minutes, changes: dict[str, str], line_speakers: list[s
     m.summary = replace_labels(m.summary, changes)
     m.minutes = [replace_labels(x, changes) for x in m.minutes]
     m.participants = list(dict.fromkeys(s for s in line_speakers if s))
+    if roles is not None:
+        m.roles = {p: roles[p] for p in m.participants if roles.get(p)}
     for d in m.decisions:
         d.text = replace_labels(d.text, changes)
     for a in m.action_items:
