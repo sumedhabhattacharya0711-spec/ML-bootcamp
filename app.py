@@ -38,24 +38,66 @@ MODEL_CHOICES = [
 ]
 STATUS_HEADERS = ["Stage", "Status", "Time (s)", "Message"]
 
-# Light, neutral theme: slate greys with one blue accent, system fonts (no web-font download).
-THEME = gr.themes.Base(
-    primary_hue="blue",
-    neutral_hue="slate",
-    font=[gr.themes.Font(f) for f in ("Inter", "Segoe UI", "system-ui", "sans-serif")],
-    font_mono=[gr.themes.Font(f) for f in ("Cascadia Mono", "Consolas", "ui-monospace", "monospace")],
-    radius_size="sm",
-).set(
-    body_background_fill="#f8fafc",
-    block_background_fill="#ffffff",
-    block_border_color="#e2e8f0",
-    block_label_text_weight="600",
-    button_primary_background_fill="#1e40af",
-    button_primary_background_fill_hover="#1d4ed8",
-    button_primary_text_color="#ffffff",
-)
-# Always light, even when the browser prefers dark mode.
-FORCE_LIGHT_JS = "() => { document.body.classList.remove('dark'); }"
+SANS = ("Inter", "Helvetica Neue", "Segoe UI", "Arial", "sans-serif")
+
+
+def _light_theme() -> gr.themes.Base:
+    """Minimal monochrome theme: white page, near-black text, thin grey rules."""
+    theme = gr.themes.Base(
+        primary_hue="neutral",
+        neutral_hue="neutral",
+        font=[gr.themes.Font(f) for f in SANS],
+        font_mono=[gr.themes.Font(f) for f in SANS],  # tables read better in the body font
+        radius_size="sm",
+        spacing_size="md",
+    ).set(
+        body_background_fill="#ffffff",
+        body_text_color="#111111",
+        body_text_color_subdued="#6b6b6b",
+        background_fill_primary="#ffffff",
+        background_fill_secondary="#fafafa",
+        block_background_fill="#ffffff",
+        block_border_color="#e5e5e5",
+        block_border_width="1px",
+        block_shadow="none",
+        block_label_background_fill="#ffffff",
+        block_label_text_color="#6b6b6b",
+        block_title_text_color="#111111",
+        border_color_primary="#e5e5e5",
+        input_background_fill="#ffffff",
+        input_border_color="#e5e5e5",
+        input_shadow="none",
+        button_primary_background_fill="#111111",
+        button_primary_background_fill_hover="#333333",
+        button_primary_text_color="#ffffff",
+        button_primary_border_color="#111111",
+        table_even_background_fill="#ffffff",
+        table_odd_background_fill="#fafafa",
+        table_border_color="#e5e5e5",
+    )
+    # Always light: give every dark-mode variable its light value.
+    for name in vars(theme).copy():
+        if name.endswith("_dark"):
+            setattr(theme, name, getattr(theme, name[:-len("_dark")]))
+    return theme
+
+
+THEME = _light_theme()
+CSS = """
+.page-header {padding: 8px 0 4px 0; border-bottom: 1px solid #e5e5e5; margin-bottom: 8px;}
+.page-header .kicker {color: #6b6b6b; letter-spacing: 0.08em; font-size: 0.85rem; text-transform: uppercase;}
+.page-header h1 {font-family: "CMU Serif", "Latin Modern Roman", Georgia, "Times New Roman", serif;
+                 font-weight: 700; font-size: 2.6rem; margin: 2px 0 8px 0; color: #111111;}
+.page-header p {color: #333333; font-size: 1.05rem; max-width: 900px; margin: 0 0 12px 0;}
+"""
+HEADER_HTML = """
+<div class="page-header">
+  <div class="kicker">Local meeting transcription</div>
+  <h1>Meeting Assistant</h1>
+  <p>Recording &rarr; raw transcript &rarr; corrected transcript &rarr; meeting record.
+     Speech-to-text runs on this machine; the two LLM steps use the provider set in <code>.env</code>.</p>
+</div>
+"""
 SAVED_FILES = ["minutes.md", "minutes.json", "transcript_raw.txt", "transcript_refined.txt",
                "edit_log.json", "run.json"]
 
@@ -244,8 +286,7 @@ def run_meeting(audio_file, glossary_text, packs, size):
 def build_ui(default_size: str) -> gr.Blocks:
     global OUTPUTS
     with gr.Blocks(title="Meeting Assistant") as demo:
-        gr.Markdown("## Meeting Assistant\nRecording → raw transcript → corrected transcript → meeting record. "
-                    "Runs locally; the LLM steps use the provider set in `.env`.")
+        gr.HTML(HEADER_HTML)
         with gr.Row():
             audio = gr.File(label="Meeting recording",
                             file_types=sorted(SUPPORTED_EXTENSIONS), type="filepath")
@@ -316,5 +357,5 @@ if __name__ == "__main__":
 
     demo = build_ui(args.model_size)
     demo.queue(default_concurrency_limit=1)  # one GPU, one model: one run at a time
-    demo.launch(server_name="127.0.0.1", server_port=args.port, theme=THEME, js=FORCE_LIGHT_JS,
+    demo.launch(server_name="127.0.0.1", server_port=args.port, theme=THEME, css=CSS,
                 footer_links=[])
