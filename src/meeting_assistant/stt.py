@@ -168,9 +168,12 @@ def transcribe(path: str | Path, model, glossary_terms: list[Term] | None = None
         condition_on_previous_text=False,  # stops one chunk's text looping into the next
     )
     segments = []
+    # float(): faster-whisper returns numpy floats for times and word probabilities;
+    # plain floats keep comparisons and the saved JSON simple.
     for s in raw_segments:  # a generator: decoding happens while we iterate
-        words = [Word(w.start, w.end, w.word.strip(), w.probability) for w in (s.words or [])]
-        segments.append(Segment(s.start, s.end, s.text.strip(), s.no_speech_prob,
+        words = [Word(float(w.start), float(w.end), w.word.strip(), float(w.probability))
+                 for w in (s.words or [])]
+        segments.append(Segment(float(s.start), float(s.end), s.text.strip(), s.no_speech_prob,
                                 s.avg_logprob, s.compression_ratio, words))
     elapsed = time.perf_counter() - started
 

@@ -29,9 +29,11 @@ load_dotenv(PROJECT_DIR / ".env")
 # ---------- Settings (move to config.yaml later) ----------
 
 MODEL = os.getenv("LLM_MODEL", "gpt-4.1")  # non-reasoning model: accepts temperature 0
+BASE_URL = os.getenv("LLM_BASE_URL") or None  # any OpenAI-compatible API, e.g. Groq; None = OpenAI
 TEMPERATURE = 0
 TIMEOUT_S = 60
-MAX_RETRIES = 1  # the openai library retries rate limits, timeouts and server errors once
+MAX_RETRIES = 3  # retries rate limits, timeouts and server errors, waiting as long as the
+                 # provider asks (free tiers like Groq allow only a few thousand tokens per minute)
 
 # Models that rejected the temperature setting (reasoning models). Filled in at runtime.
 _no_temperature: set[str] = set()
@@ -59,7 +61,7 @@ def get_client() -> openai.OpenAI:
     key = os.getenv("LLM_API_KEY", "").strip()
     if not key:
         raise LLMError("LLM_API_KEY is not set. Add it to the .env file in the project folder.")
-    return openai.OpenAI(api_key=key, timeout=TIMEOUT_S, max_retries=MAX_RETRIES)
+    return openai.OpenAI(api_key=key, base_url=BASE_URL, timeout=TIMEOUT_S, max_retries=MAX_RETRIES)
 
 
 def _friendly(e: Exception) -> LLMError:
@@ -68,12 +70,12 @@ def _friendly(e: Exception) -> LLMError:
         return LLMError("LLM call failed: the API key was rejected (check LLM_API_KEY in .env).")
     if isinstance(e, openai.RateLimitError):
         if "insufficient_quota" in str(e):
-            return LLMError("LLM call failed: quota exceeded (add credit / billing on the OpenAI account).")
-        return LLMError("LLM call failed: rate limited by OpenAI, try again in a minute.")
+            return LLMError("LLM call failed: quota exceeded (add credit / billing on the LLM provider account).")
+        return LLMError("LLM call failed: rate limited by the LLM provider, try again in a minute.")
     if isinstance(e, openai.APITimeoutError):
         return LLMError(f"LLM call failed: no response after {TIMEOUT_S} s.")
     if isinstance(e, openai.APIConnectionError):
-        return LLMError("LLM call failed: could not reach the OpenAI API (check the internet connection).")
+        return LLMError("LLM call failed: could not reach the LLM API (check the internet connection).")
     if isinstance(e, openai.NotFoundError):
         return LLMError(f"LLM call failed: model not found or not available to this key: {MODEL}")
     if isinstance(e, openai.LengthFinishReasonError):
