@@ -5,7 +5,7 @@ Three sources, in order of trust (see the implementation doc, Stage 2):
   2. "inferred" - terms an LLM guesses from the raw transcript (verified by Python)
   3. "pack"     - optional preset word lists in data/glossary/*.txt
 
-Stage 1 uses to_initial_prompt() to bias Whisper's spelling.
+Stage 1 uses to_hotwords() to bias Whisper's spelling.
 Stage 2 (refine.py) uses the full list to propose correction hints.
 """
 
@@ -181,8 +181,8 @@ def build_glossary(
 
 # ---------- Whisper hint ----------
 
-def to_initial_prompt(terms: list[Term], max_terms: int = 50, max_chars: int = 600) -> str:
-    """Turn the glossary into Whisper's initial_prompt, e.g. "Kubeflow, ONNX, LoRA".
+def to_hotwords(terms: list[Term], max_terms: int = 50, max_chars: int = 600) -> str:
+    """Turn the glossary into Whisper's hotwords hint, e.g. "Kubeflow, ONNX, LoRA".
 
     Whisper keeps only ~224 tokens of prompt and silently cuts the rest, and a
     very long list can make it "hear" terms nobody said. So we keep whole terms

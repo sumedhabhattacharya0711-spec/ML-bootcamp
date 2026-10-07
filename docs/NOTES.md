@@ -166,3 +166,24 @@ was checked with the full test suite plus real runs on the AMI ES2004a clip.
 - **Tests:** 5 new (multi-word term already correct; cut-off retried for text
   and structured calls; cut off twice gives the error; rejected
   reasoning_effort dropped).
+
+### Fix: wrong "I mean," -> "menu" edit; Whisper hint for the whole recording
+
+- **Problem (seen on ES2004a):** the hint "mean" -> menu (sound-alike) was
+  accepted by the LLM, which also swallowed the "I" before it; the guard let it
+  through because "menu" is a glossary term. Separately, the glossary reached
+  Whisper only for the first 30-second window (`initial_prompt` with
+  `condition_on_previous_text=False`).
+- **Guard (refine.py):** an edit may only change words inside one of that
+  line's hints; anything else is blocked with "changes words that were not
+  hinted". Number, negation and deletion checks come first, as before.
+- **Hints (refine.py):** everyday verbs, nouns and fillers seen as false hints
+  ("mean", "stuff", "work", "people", ...) added to `COMMON_WORDS`.
+- **Whisper (stt.py):** the glossary is passed as `hotwords`, which faster-whisper
+  adds to every window. `glossary.to_initial_prompt` renamed `to_hotwords`;
+  `Transcript.initial_prompt` renamed `hotwords`.
+- **Result on ES2004a:** 1 edit applied ("user friendly," -> "User-friendly,"),
+  2 bad edits blocked (one by the new hinted-words rule); no "menu" edit; all
+  4 stages done.
+- **Tests:** 2 new (edit outside the hinted words is blocked; "mean" is not
+  hinted as menu); guard tests now pass the hinted word ranges.

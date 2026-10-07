@@ -73,31 +73,31 @@ def test_doubtful_lines_get_no_hints():
 # ---------- guard ----------
 
 def test_guard_allows_glossary_fix():
-    line, edits = guard_line(0, "jobs run on cube flow now.", "jobs run on Kubeflow now.", GLOSSARY)
+    line, edits = guard_line(0, "jobs run on cube flow now.", "jobs run on Kubeflow now.", GLOSSARY, [(3, 5)])
     assert line == "jobs run on Kubeflow now."
     assert edits[0].status == "applied"
 
 
 def test_guard_blocks_not_to_now():
-    line, edits = guard_line(0, "we will not ship it.", "we will now ship it.", GLOSSARY)
+    line, edits = guard_line(0, "we will not ship it.", "we will now ship it.", GLOSSARY, [(2, 3)])
     assert line == "we will not ship it."
     assert edits[0].status == "blocked" and edits[0].reason == "touches a negation"
 
 
 def test_guard_blocks_15th_to_16th():
-    line, edits = guard_line(0, "due on the 15th.", "due on the 16th.", GLOSSARY)
+    line, edits = guard_line(0, "due on the 15th.", "due on the 16th.", GLOSSARY, [(3, 4)])
     assert line == "due on the 15th."
     assert edits[0].reason == "touches a number"
 
 
 def test_guard_blocks_non_glossary_rewrite():
-    line, edits = guard_line(0, "we kind of like it.", "we really like it.", GLOSSARY)
+    line, edits = guard_line(0, "we kind of like it.", "we really like it.", GLOSSARY, [(1, 3)])
     assert line == "we kind of like it."
     assert edits[0].reason == "result is not a glossary term"
 
 
 def test_guard_ignores_punctuation_only_changes():
-    line, edits = guard_line(0, "ok so cube flow", "OK, so Kubeflow.", GLOSSARY)
+    line, edits = guard_line(0, "ok so cube flow", "OK, so Kubeflow.", GLOSSARY, [(2, 4)])
     assert line == "ok so Kubeflow."
     assert [e.before for e in edits] == ["cube flow"]
 
@@ -173,3 +173,15 @@ def test_correct_multi_word_term_gives_no_hint():
     # Same words, different capitals and punctuation: nothing to fix.
     assert find_hints(["I'm Sarah, project manager, and this is our meeting."], ["Project manager"]) == []
     assert [h.term for h in find_hints(["follow G D P R rules."], ["GDPR"])] == ["GDPR"]
+
+
+def test_guard_blocks_edit_outside_the_hinted_words():
+    # Hint was only "mean," (word 4); the LLM also swallowed "I" (word 3).
+    raw = "that's the main stuff anyway. I mean, you don't want to"
+    line, edits = guard_line(0, raw, "that's the main stuff anyway. menu you don't want to", ["menu"], [(4, 5)])
+    assert line == raw
+    assert edits[0].reason == "changes words that were not hinted"
+
+
+def test_mean_is_not_hinted_as_menu():
+    assert find_hints(["I mean, you don't want to."], ["menu"]) == []

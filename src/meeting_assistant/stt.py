@@ -17,7 +17,7 @@ import time
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
-from meeting_assistant.glossary import Term, to_initial_prompt
+from meeting_assistant.glossary import Term, to_hotwords
 
 SUPPORTED_EXTENSIONS = {".wav", ".mp3", ".m4a", ".flac", ".ogg", ".webm", ".mp4"}
 MIN_DURATION_S = 1.0
@@ -146,7 +146,7 @@ class Transcript:
     duration_s: float
     model_size: str
     transcribe_s: float
-    initial_prompt: str
+    hotwords: str
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -156,7 +156,7 @@ def transcribe(path: str | Path, model, glossary_terms: list[Term] | None = None
                model_size: str = "medium") -> Transcript:
     """Check the file, then transcribe it. Raises AudioInputError for bad input."""
     duration = check_audio(path)
-    initial_prompt = to_initial_prompt(glossary_terms) if glossary_terms else ""
+    hotwords = to_hotwords(glossary_terms) if glossary_terms else ""
 
     started = time.perf_counter()
     raw_segments, info = model.transcribe(
@@ -164,7 +164,9 @@ def transcribe(path: str | Path, model, glossary_terms: list[Term] | None = None
         language="en",
         vad_filter=True,                   # skip silence, where Whisper invents text
         word_timestamps=True,              # per-word times and confidences
-        initial_prompt=initial_prompt or None,
+        # hotwords, not initial_prompt: with condition_on_previous_text=False,
+        # initial_prompt only reaches the first 30-second window; hotwords reach all.
+        hotwords=hotwords or None,
         condition_on_previous_text=False,  # stops one chunk's text looping into the next
     )
     segments = []
@@ -184,7 +186,7 @@ def transcribe(path: str | Path, model, glossary_terms: list[Term] | None = None
         duration_s=duration,
         model_size=model_size,
         transcribe_s=round(elapsed, 2),
-        initial_prompt=initial_prompt,
+        hotwords=hotwords,
     )
 
 

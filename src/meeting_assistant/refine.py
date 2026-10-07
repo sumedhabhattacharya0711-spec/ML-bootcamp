@@ -59,6 +59,13 @@ COMMON_WORDS = {
     "those", "through", "to", "too", "up", "us", "use", "very", "want", "was", "way", "we",
     "well", "were", "what", "when", "where", "which", "while", "who", "why", "will", "with",
     "would", "yeah", "yes", "you", "your",
+    # Everyday verbs, nouns and fillers seen as false hints in real meetings ("mean" -> menu).
+    "actually", "anyway", "basically", "better", "bit", "call", "called", "day", "different",
+    "everyone", "everything", "feel", "find", "first", "guess", "keep", "last", "let", "little",
+    "lot", "made", "mean", "means", "meant", "move", "next", "nothing", "people", "pretty",
+    "probably", "put", "quite", "remember", "seem", "show", "someone", "start", "stuff",
+    "suppose", "sure", "talk", "tell", "time", "told", "try", "trying", "understand", "week",
+    "work", "works", "year",
 }
 
 NUMBER_WORDS = {
@@ -198,8 +205,9 @@ class Edit:
     reason: str
 
 
-def _block_reason(before: str, after: str, terms: list[str]) -> str | None:
-    """Why this edit must be reverted, or None if it is safe."""
+def _block_reason(before: str, after: str, terms: list[str], hinted: bool) -> str | None:
+    """Why this edit must be reverted, or None if it is safe. `hinted` says
+    whether the changed words lie inside one of the line's hints."""
     words = before.split() + after.split()
     cleaned = {_clean(w) for w in words}
     if any(ch.isdigit() for ch in before + after) or cleaned & NUMBER_WORDS:
@@ -208,15 +216,20 @@ def _block_reason(before: str, after: str, terms: list[str]) -> str | None:
         return "touches a negation"
     if not after.strip():
         return "deletes words"
+    if not hinted:
+        return "changes words that were not hinted"
     after_clean = _clean(after)
     if not any(fuzz.ratio(after_clean, _clean(t)) >= GUARD_TERM_SCORE for t in terms):
         return "result is not a glossary term"
     return None
 
 
-def guard_line(line: int, raw: str, corrected: str, terms: list[str]) -> tuple[str, list[Edit]]:
+def guard_line(line: int, raw: str, corrected: str, terms: list[str],
+               hinted: list[tuple[int, int]]) -> tuple[str, list[Edit]]:
     """Diff raw vs corrected word by word. Keep safe edits, revert the rest.
-    Words are compared without punctuation, so punctuation-only changes are ignored."""
+    `hinted` are the (start, end) word ranges of this line's hints; an edit may
+    only change words inside one of them. Words are compared without
+    punctuation, so punctuation-only changes are ignored."""
     raw_toks, new_toks = raw.split(), corrected.split()
     matcher = SequenceMatcher(a=[_clean(t) for t in raw_toks],
                               b=[_clean(t) for t in new_toks], autojunk=False)
@@ -226,7 +239,8 @@ def guard_line(line: int, raw: str, corrected: str, terms: list[str]) -> tuple[s
             out += raw_toks[i1:i2]
             continue
         before, after = " ".join(raw_toks[i1:i2]), " ".join(new_toks[j1:j2])
-        reason = _block_reason(before, after, terms)
+        inside = i1 < i2 and any(start <= i1 and i2 <= end for start, end in hinted)
+        reason = _block_reason(before, after, terms, inside)
         if reason:
             out += raw_toks[i1:i2]
             edits.append(Edit(line, before, after, "blocked", reason))
@@ -308,7 +322,8 @@ def refine(segments, glossary, call_llm=None, doubtful: set[int] | None = None,
             continue
         if not 0 <= i < len(lines) or not isinstance(corrected, str):
             continue
-        result.refined[i], edits = guard_line(i, lines[i], corrected, terms)
+        hinted = [(h.start, h.end) for h in result.hints if h.line == i]
+        result.refined[i], edits = guard_line(i, lines[i], corrected, terms, hinted)
         result.edits += edits
 
     for item in data.get("possible_errors") or []:

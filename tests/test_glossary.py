@@ -8,7 +8,7 @@ from meeting_assistant.glossary import (
     load_packs,
     merge_terms,
     parse_user_terms,
-    to_initial_prompt,
+    to_hotwords,
 )
 
 RAW = (
@@ -94,17 +94,17 @@ def test_build_glossary_without_llm_skips_inference():
     assert warnings == []
 
 
-def test_initial_prompt_format_and_cap():
+def test_hotwords_format_and_cap():
     terms = [Term(f"term{i}", "pack") for i in range(100)]
-    prompt = to_initial_prompt([Term("Kubeflow", "user")] + terms, max_terms=10)
+    prompt = to_hotwords([Term("Kubeflow", "user")] + terms, max_terms=10)
     parts = prompt.split(", ")
     assert len(parts) == 10
     assert parts[0] == "Kubeflow"  # most trusted first
 
 
-def test_initial_prompt_never_cuts_a_term_in_half():
+def test_hotwords_never_cuts_a_term_in_half():
     terms = [Term(f"{'A' * 30}{i}", "user") for i in range(5)]
-    prompt = to_initial_prompt(terms, max_chars=70)
+    prompt = to_hotwords(terms, max_chars=70)
     assert prompt.split(", ") == [terms[0].text, terms[1].text]
 
 
