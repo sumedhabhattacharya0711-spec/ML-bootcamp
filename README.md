@@ -196,7 +196,7 @@ pytest                      # also runs the one slow test with real Whisper
 ### 4.1 Data flow
 
 ```mermaid
-flowchart LR
+flowchart TB
     A[Meeting audio] --> C{check_audio<br/>ffprobe}
     C -- bad file --> E[Clear error,<br/>later stages skipped]
     C -- ok --> W[Whisper medium<br/>faster-whisper + Silero VAD]
