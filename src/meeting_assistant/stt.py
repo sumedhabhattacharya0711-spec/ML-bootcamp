@@ -136,6 +136,7 @@ class Segment:
     avg_logprob: float
     compression_ratio: float
     words: list[Word] = field(default_factory=list)
+    speaker: str | None = None  # "S1", "S2", ... from diarization (speakers.py); None = unknown
 
 
 @dataclass

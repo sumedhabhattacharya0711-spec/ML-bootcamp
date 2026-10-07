@@ -1,9 +1,15 @@
 # Speech-to-text: Whisper through faster-whisper (CTranslate2 engine)
 faster-whisper
+av>=11,<19       # PyAV 19 dropped an option faster-whisper 1.2 passes when opening audio
 # CUDA libraries so faster-whisper can use an NVIDIA GPU on Linux / WSL.
 # Without a GPU the app still works: Whisper falls back to the CPU (slower).
 nvidia-cublas-cu12; sys_platform == "linux"
 nvidia-cudnn-cu12>=9,<10; sys_platform == "linux"
+
+# Speaker diarization (who spoke when): pyannote, which brings PyTorch (~2-3 GB download).
+# The model is gated: set HF_TOKEN in .env and accept its conditions on Hugging Face.
+# Without it the app still works; the speaker stages are skipped.
+pyannote.audio>=4
 
 # Audio handling
 soundfile

@@ -122,9 +122,11 @@ def _repeat_runs(texts: list[str]) -> list[int]:
     return runs
 
 
-def score_segments(segments, duration_s: float) -> list[SegmentFlag]:
+def score_segments(segments, duration_s: float, diarized: bool = False) -> list[SegmentFlag]:
     """Score every segment. `segments` are stt.Segment objects (anything with
-    start, text, no_speech_prob, avg_logprob, compression_ratio works)."""
+    start, text, no_speech_prob, avg_logprob, compression_ratio works).
+    `diarized`: speakers were assigned (speakers.py), so a segment without a
+    speaker is one where diarization heard no voice at all."""
     texts = [_norm(s.text) for s in segments]
     runs = _repeat_runs(texts)
     end_zone_start = duration_s * (1 - END_FRACTION)
@@ -162,6 +164,13 @@ def score_segments(segments, duration_s: float) -> list[SegmentFlag]:
         if seg.compression_ratio > COMPRESSION_RATIO_MAX:
             score += 1
             reasons.append("looping text")
+
+        # Diarization looks for voices independently of Whisper: text where it
+        # found nobody speaking is likely invented. One point only, because
+        # diarization can also miss quiet speech.
+        if diarized and getattr(seg, "speaker", None) is None and texts[i]:
+            score += 1
+            reasons.append("no voice found by diarization")
 
         results.append(SegmentFlag(i, score, score >= FLAG_SCORE, reasons))
     return results

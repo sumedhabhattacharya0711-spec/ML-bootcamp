@@ -219,3 +219,100 @@ def test_part_summary_merge_falls_back_when_llm_fails():
         raise RuntimeError("rate limited")
 
     assert merge_drafts([a, b], broken).summary == "First half. Second half."
+
+
+# ---------- With speakers (diarization) ----------
+
+TALK = ["I propose we keep the rubber case.",      # 0 Priya
+        "Yes, I agree, rubber it is.",             # 1 Priya (the proposer agreeing with herself)
+        "Rubber sounds right to me.",              # 2 Rahul
+        "Someone has to send the cost sheet.",     # 3 Priya
+        "I'll send the cost sheet by Friday.",     # 4 Rahul
+        "Sam will check the supplier.",            # 5 Priya
+        "Okay, fine."]                             # 6 Rahul
+WHO = ["Priya", "Priya", "Rahul", "Priya", "Rahul", "Priya", "Rahul"]
+TALK_INDEX = QuoteIndex(list(enumerate(TALK)), [5.0 * i for i in range(len(TALK))], WHO)
+
+
+def test_agreement_by_the_proposer_themself_does_not_count():
+    alone = decision("Rubber case", "I propose we keep the rubber case", agree=["Yes, I agree, rubber it is"])
+    result = verify(draft([alone]), TALK_INDEX)
+    assert result.minutes.decisions[0].status == "open"
+    assert any("by the proposer (Priya) themself" in n for n in result.dropped)
+    other = decision("Rubber case", "I propose we keep the rubber case", agree=["Rubber sounds right to me"])
+    assert verify(draft([other]), TALK_INDEX).minutes.decisions[0].status == "agreed"
+
+
+def test_i_will_do_it_makes_its_speaker_the_owner():
+    a = action("Send the cost sheet", "Someone has to send the cost sheet",
+               agreement_quote="I'll send the cost sheet by Friday",
+               deadline="by Friday", deadline_quote="I'll send the cost sheet by Friday")
+    result = verify(draft(actions=[a]), TALK_INDEX)
+    item = result.minutes.action_items[0]
+    assert (item.owner, item.deadline, item.status) == ("Rahul", "by Friday", "agreed")
+    assert result.checks["owners_from_speaker"] == 1
+    assert {e.speaker for e in item.evidence} == {"Priya", "Rahul"}
+
+
+def test_owner_given_as_the_volunteering_speaker_is_supported():
+    a = action("Send the cost sheet", "I'll send the cost sheet", owner="Rahul",
+               owner_quote="I'll send the cost sheet by Friday")
+    item = verify(draft(actions=[a]), TALK_INDEX).minutes.action_items[0]
+    assert item.owner == "Rahul"
+
+
+def test_volunteer_line_by_someone_else_does_not_support_the_owner():
+    a = action("Send the cost sheet", "I'll send the cost sheet", owner="Priya",
+               owner_quote="I'll send the cost sheet by Friday")
+    result = verify(draft(actions=[a]), TALK_INDEX)
+    assert result.minutes.action_items[0].owner == "Rahul"  # the one who said "I'll" gets it
+    assert any('owner "Priya" not supported' in n for n in result.dropped)
+
+
+def test_acceptance_by_someone_other_than_the_owner_is_only_proposed():
+    a = action("Check the supplier", "Sam will check the supplier", owner="Sam",
+               owner_quote="Sam will check the supplier", agreement_quote="Okay, fine.")
+    item = verify(draft(actions=[a]), TALK_INDEX).minutes.action_items[0]
+    assert (item.owner, item.status) == ("Sam", "agreed")  # Sam is no known speaker: no speaker check
+    rahul = action("Check the supplier", "Sam will check the supplier", owner="Priya",
+                   owner_quote="Someone has to send the cost sheet", agreement_quote="Rubber sounds right to me")
+    # owner "Priya" is not in her quote and she did not volunteer: unspecified, so unassigned
+    assert verify(draft(actions=[rahul]), TALK_INDEX).minutes.action_items[0].status == "unassigned"
+
+
+def test_speaker_label_copied_into_a_quote_is_tolerated():
+    d = decision("Rubber case", "Priya: I propose we keep the rubber case", agree=["Rahul: Rubber sounds right"])
+    assert verify(draft([d]), TALK_INDEX).minutes.decisions[0].status == "agreed"
+
+
+def test_llm_sees_speakers_and_markdown_shows_them():
+    text, _ = format_transcript(TALK, {6}, WHO)
+    assert text.split("\n")[0] == "[0] Priya: I propose we keep the rubber case."
+    assert text.split("\n")[6] == "[6] [DOUBTFUL] Rahul: Okay, fine."
+    d = decision("Rubber case", "I propose we keep the rubber case", agree=["Rubber sounds right to me"])
+    md = to_markdown(verify(draft([d]), TALK_INDEX).minutes)
+    assert 'Rahul, agreement: _"Rubber sounds right to me"_' in md
+
+
+def test_rename_in_minutes_changes_names_but_not_quotes():
+    from meeting_assistant.minutes import rename_in_minutes
+
+    a = action("Rahul sends the cost sheet", "Someone has to send the cost sheet",
+               agreement_quote="I'll send the cost sheet by Friday")
+    m = verify(draft(actions=[a]), TALK_INDEX).minutes
+    m.summary = "Rahul will send the sheet."
+    new_who = ["Priya", "Priya", "Rahul V.", "Priya", "Rahul V.", "Priya", "Rahul V."]
+    rename_in_minutes(m, {"Rahul": "Rahul V."}, new_who)
+    item = m.action_items[0]
+    assert (m.summary, item.task, item.owner) == ("Rahul V. will send the sheet.",
+                                                  "Rahul V. sends the cost sheet", "Rahul V.")
+    assert {e.speaker for e in item.evidence} == {"Priya", "Rahul V."}
+    assert m.participants == ["Priya", "Rahul V."]
+
+
+def test_label_copied_into_owner_quote_is_not_support():
+    a = action("Send the cost sheet", "Someone has to send the cost sheet", owner="Rahul",
+               owner_quote="Rahul: Rubber sounds right to me.")
+    result = verify(draft(actions=[a]), TALK_INDEX)
+    assert result.minutes.action_items[0].owner == "unspecified"
+    assert all(not e.quote.startswith("Rahul:") for e in result.minutes.action_items[0].evidence)
