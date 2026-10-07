@@ -108,3 +108,21 @@ was checked with the full test suite plus real runs on the AMI ES2004a clip.
   `transcript_refined.txt`, `edit_log.json`, `minutes.md`, `minutes.json`,
   `run.json` (statuses, segments, flags, glossary, LLM token usage).
   Tests: `tests/test_pipeline.py` (fake Whisper model + fake LLM, 4 tests).
+
+### Batch P: pipeline.py
+
+- **Problem:** an unknown glossary pack name crashed the whole run with a raw
+  `FileNotFoundError`, and the glossary build sat outside Stage 2's error
+  handling. Failed runs were not saved although the docstring said every run
+  is. Stage 1's time stayed 0.0 s when it failed.
+- **Change:** loading typed + pack terms moved inside Stage 1's `try`; an
+  unknown pack now gives "Stage 1 failed: Glossary pack not found: ..." and
+  skips the rest. `build_glossary` moved inside Stage 2's `try`. Failed runs
+  are saved too (`run.json` records why). Stage 1's time is set on failure.
+  Docstring says the glossary build is timed with Stage 2.
+- **Readability:** typed `flags: list[SegmentFlag]`, `glossary: list[Term]`;
+  sorted the glossary import; `stage3_lines` renamed `minutes_input`.
+- **Not changed:** packs are still read twice (for Whisper's hint and inside
+  `build_glossary`); avoiding that needs a change to glossary.py's API, and
+  reading a few short text files twice is harmless.
+- **Tests:** 2 new (unknown pack gives a status; failed run is saved).

@@ -7,8 +7,9 @@
   Stage 3   minutes                 LLM #2 writes the meeting record
 
 Each stage keeps its own status and output, so a later failure never hides an
-earlier result: if Stage 2 fails, Stage 3 runs on the raw transcript. Every run
-is saved to runs/<timestamp>/.
+earlier result: if Stage 2 fails, Stage 3 runs on the raw transcript. The
+glossary is built (with one LLM call) as part of Stage 2 and timed with it.
+Every run, including failed ones, is saved to runs/<timestamp>/.
 
 Try it:  python -m meeting_assistant.pipeline data/audio/ES2004a_1min.wav --terms "Real Reaction"
 """
@@ -20,8 +21,8 @@ from datetime import datetime
 from pathlib import Path
 
 from meeting_assistant import llm
-from meeting_assistant.glossary import build_glossary, parse_user_terms, load_packs, merge_terms
-from meeting_assistant.hallucination import doubtful_indices, score_segments
+from meeting_assistant.glossary import Term, build_glossary, load_packs, merge_terms, parse_user_terms
+from meeting_assistant.hallucination import SegmentFlag, doubtful_indices, score_segments
 from meeting_assistant.minutes import MinutesResult, to_json, to_markdown, write_minutes
 from meeting_assistant.paths import RUNS_DIR
 from meeting_assistant.refine import RefineResult, refine
@@ -43,8 +44,8 @@ class StageStatus:
 class PipelineResult:
     stages: list[StageStatus]
     transcript: Transcript | None = None
-    flags: list = field(default_factory=list)
-    glossary: list = field(default_factory=list)
+    flags: list[SegmentFlag] = field(default_factory=list)
+    glossary: list[Term] = field(default_factory=list)
     refined: RefineResult | None = None
     minutes: MinutesResult | None = None
     run_dir: Path | None = None
@@ -67,16 +68,16 @@ def run(audio_path, model, glossary_text: str = "", packs: list[str] | None = No
     stt_stage, flag_stage, refine_stage, minutes_stage = result.stages
     usage_start = len(llm.usage_log)
 
-    # Typed and pack terms are known before Whisper runs, so they can bias its spelling.
-    typed_terms = merge_terms(parse_user_terms(glossary_text), load_packs(packs) if packs else [])
-
     started = time.perf_counter()
     try:
+        # Typed and pack terms are known before Whisper runs, so they can bias its spelling.
+        typed_terms = merge_terms(parse_user_terms(glossary_text), load_packs(packs) if packs else [])
         result.transcript = transcribe(audio_path, model, typed_terms, model_size=model_size)
-    except AudioInputError as e:
-        stt_stage.status, stt_stage.message = "failed", str(e)
+    except (AudioInputError, FileNotFoundError) as e:  # bad recording, or unknown glossary pack
+        stt_stage.status, stt_stage.message, stt_stage.seconds = "failed", str(e), _since(started)
         for stage in result.stages[1:]:
             stage.status, stage.message = "skipped", "no transcript"
+        result.run_dir = save(result, runs_dir, llm.usage_log[usage_start:])
         return result
     stt_stage.status, stt_stage.seconds = "done", _since(started)
     stt_stage.message = f"{len(result.transcript.segments)} segments"
@@ -90,8 +91,8 @@ def run(audio_path, model, glossary_text: str = "", packs: list[str] | None = No
     flag_stage.message = f"{len(doubtful)} of {len(segments)} segments flagged"
 
     started = time.perf_counter()
-    result.glossary, warnings = build_glossary(glossary_text, lines, call_llm, packs, doubtful)
     try:
+        result.glossary, warnings = build_glossary(glossary_text, lines, call_llm, packs, doubtful)
         result.refined = refine(segments, result.glossary, call_llm, doubtful)
         refine_stage.status = "done"
         warnings += result.refined.warnings
@@ -102,9 +103,9 @@ def run(audio_path, model, glossary_text: str = "", packs: list[str] | None = No
     refine_stage.seconds = _since(started)
 
     started = time.perf_counter()
-    stage3_lines = result.refined.refined if result.refined else lines
+    minutes_input = result.refined.refined if result.refined else lines
     try:
-        result.minutes = write_minutes(stage3_lines, call_structured, doubtful)
+        result.minutes = write_minutes(minutes_input, call_structured, doubtful)
         minutes_stage.status = "done"
         minutes_stage.message = f"{len(result.minutes.dropped)} items removed or downgraded by the checks"
     except Exception as e:

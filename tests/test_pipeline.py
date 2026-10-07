@@ -86,3 +86,18 @@ def test_minutes_failure_keeps_transcripts(audio, tmp_path):
     assert r.stages[3].status == "failed" and "validation" in r.stages[3].message
     assert (r.run_dir / "transcript_refined.txt").read_text().startswith("We moved the training jobs to Kubeflow.")
     assert not (r.run_dir / "minutes.md").exists()
+
+
+def test_unknown_pack_fails_stage_1_instead_of_crashing(audio, tmp_path):
+    r = run(audio, FakeWhisper(), packs=["no_such_pack"], runs_dir=tmp_path / "runs")
+    assert r.stages[0].status == "failed"
+    assert "Glossary pack not found" in r.stages[0].message and "no_such_pack" in r.stages[0].message
+    assert [s.status for s in r.stages[1:]] == ["skipped"] * 3
+
+
+def test_failed_run_is_saved_too(tmp_path):
+    empty = tmp_path / "empty.wav"
+    empty.touch()
+    r = run(empty, FakeWhisper(), runs_dir=tmp_path / "runs")
+    saved = json.loads((r.run_dir / "run.json").read_text())
+    assert saved["stages"][0]["status"] == "failed"
