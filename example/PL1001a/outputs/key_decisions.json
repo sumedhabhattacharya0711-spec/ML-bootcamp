@@ -1,0 +1,22 @@
+[
+  {
+    "decision": "Ship the thermostat in matte white.",
+    "status": "agreed",
+    "evidence": [
+      {
+        "role": "proposal",
+        "quote": "I propose we ship the thermostat in matte white.",
+        "speaker": "Emma",
+        "time": "01:00.86",
+        "line": 12
+      },
+      {
+        "role": "agreement",
+        "quote": "Yes, Mate White looks great. Let's go with that.",
+        "speaker": "Raj",
+        "time": "01:04.92",
+        "line": 13
+      }
+    ]
+  }
+]

@@ -1,0 +1,806 @@
+[
+  {
+    "start": 36.26,
+    "end": 38.28,
+    "speaker": "Sebastian",
+    "text": "Okay, good morning everybody."
+  },
+  {
+    "start": 38.46,
+    "end": 39.02,
+    "speaker": "Sebastian",
+    "text": "Good morning."
+  },
+  {
+    "start": 39.26,
+    "end": 40.82,
+    "speaker": "Sebastian",
+    "text": "Oh, everybody's not ready."
+  },
+  {
+    "start": 41.68,
+    "end": 42.06,
+    "speaker": "Michael",
+    "text": "Almost."
+  },
+  {
+    "start": 43.88,
+    "end": 43.96,
+    "speaker": "Michael",
+    "text": "Ready."
+  },
+  {
+    "start": 43.96,
+    "end": 44.64,
+    "speaker": "Sebastian",
+    "text": "All right."
+  },
+  {
+    "start": 45.12,
+    "end": 45.94,
+    "speaker": "Sebastian",
+    "text": "Okay, let's go."
+  },
+  {
+    "start": 46.36,
+    "end": 52.72,
+    "speaker": "Sebastian",
+    "text": "So we're here today to have our first kickoff meeting about this new project we're going"
+  },
+  {
+    "start": 52.72,
+    "end": 54.58,
+    "speaker": "Sebastian",
+    "text": "to talk about in a few minutes."
+  },
+  {
+    "start": 56.66,
+    "end": 60.64,
+    "speaker": "Sebastian",
+    "text": "So I will be Sebastian, the project manager."
+  },
+  {
+    "start": 64.4,
+    "end": 66.8,
+    "speaker": "Michael",
+    "text": "Michael, I'm the User Interface Designer."
+  },
+  {
+    "start": 67.82,
+    "end": 70.4,
+    "speaker": "Speaker 3",
+    "text": "I'm Guillermo Radilla, I'm the Marketing Expert."
+  },
+  {
+    "start": 70.94,
+    "end": 73.14,
+    "speaker": "Speaker 3",
+    "text": "And I'm Hemant, the Industrial Designer."
+  },
+  {
+    "start": 73.4,
+    "end": 76.38,
+    "speaker": "Sebastian",
+    "text": "Okay, very good. Thanks for being here."
+  },
+  {
+    "start": 77.94,
+    "end": 80.18,
+    "speaker": "Sebastian",
+    "text": "So, let's have a look to the agenda."
+  },
+  {
+    "start": 81.6,
+    "end": 84.98,
+    "speaker": "Sebastian",
+    "text": "So, we are going to go through this agenda,"
+  },
+  {
+    "start": 84.98,
+    "end": 95.06,
+    "speaker": "Sebastian",
+    "text": "and mainly first to be used to the tools available in this nice and smart meeting room we have here."
+  },
+  {
+    "start": 96.56,
+    "end": 102.12,
+    "speaker": "Sebastian",
+    "text": "Then we'll go to the plan of the project and have general discussions about it."
+  },
+  {
+    "start": 104.21,
+    "end": 111.49,
+    "speaker": "Sebastian",
+    "text": "So the goal of this project is to develop a new remote control."
+  },
+  {
+    "start": 112.85,
+    "end": 119.57,
+    "speaker": "Sebastian",
+    "text": "It should be original, trendy, and also user friendly."
+  },
+  {
+    "start": 123.91,
+    "end": 131.73,
+    "speaker": "Sebastian",
+    "text": "As usual we will follow the project method that we are using in our company."
+  },
+  {
+    "start": 132.41,
+    "end": 137.95,
+    "speaker": "Sebastian",
+    "text": "It is in three steps as you know, first the functional design, the second the conceptual"
+  },
+  {
+    "start": 137.95,
+    "end": 140.39,
+    "speaker": "Sebastian",
+    "text": "design and then the detailed design."
+  },
+  {
+    "start": 140.39,
+    "end": 150.67,
+    "speaker": "Sebastian",
+    "text": "during each step of each design, you will work separately, individually on"
+  },
+  {
+    "start": 151.31,
+    "end": 159.17,
+    "speaker": "Sebastian",
+    "text": "your specific tasks and we will meet to discuss and take decisions about"
+  },
+  {
+    "start": 159.17,
+    "end": 168.02,
+    "speaker": "Sebastian",
+    "text": "what you did and what we will do next. So first we have to train"
+  },
+  {
+    "start": 168.02,
+    "end": 178.1,
+    "speaker": "Sebastian",
+    "text": "ourself with all the tools available in this nice meeting room and particularly the whiteboard."
+  },
+  {
+    "start": 178.48,
+    "end": 185.94,
+    "speaker": "Sebastian",
+    "text": "So we are going to go through the whiteboard and take some notes or do some drawings."
+  },
+  {
+    "start": 186.94,
+    "end": 188.02,
+    "speaker": "Sebastian",
+    "text": "So who wants to start?"
+  },
+  {
+    "start": 191.75,
+    "end": 192.51,
+    "speaker": "Michael",
+    "text": "Mr. McGrady?"
+  },
+  {
+    "start": 192.51,
+    "end": 193.67,
+    "speaker": "Michael",
+    "text": "I will if no one else wants to, yeah."
+  },
+  {
+    "start": 194.77,
+    "end": 199.17,
+    "speaker": "Michael",
+    "text": "Okay, so I'm going to draw my favorite animal."
+  },
+  {
+    "start": 201.54,
+    "end": 202.38,
+    "speaker": "Michael",
+    "text": "Let's see."
+  },
+  {
+    "start": 215.76,
+    "end": 225.92,
+    "speaker": "Michael",
+    "text": "Well, I don't really have a favorite animal, but I have one in mind, so I'm going to tell"
+  },
+  {
+    "start": 225.92,
+    "end": 232.96,
+    "speaker": "Michael",
+    "text": "you about the spider because you can actually draw it pretty well in the corner of a white"
+  },
+  {
+    "start": 232.96,
+    "end": 233.34,
+    "speaker": "Michael",
+    "text": "board."
+  },
+  {
+    "start": 234.34,
+    "end": 254.26,
+    "speaker": "Michael",
+    "text": "The spider lives in a web and has eight legs and it can move all about the web in two dimensions,"
+  },
+  {
+    "start": 255.74,
+    "end": 257.98,
+    "speaker": "Michael",
+    "text": "unless it's a three dimensional web which they have sometimes."
+  },
+  {
+    "start": 258.02,
+    "end": 263.76,
+    "speaker": "Michael",
+    "text": "There are some spiders that live in like, they have like a big ball of a web."
+  },
+  {
+    "start": 263.76,
+    "end": 280.24,
+    "speaker": "Michael",
+    "text": "And the other thing is some spiders can actually fly like they have, they're let out like a stream of like the web building material but it acts like a parachute so they can actually kind of go and find new, build new webs somewhere else."
+  },
+  {
+    "start": 281.08,
+    "end": 291.16,
+    "speaker": "Michael",
+    "text": "So I think they did this in Charlotte's Web, that movie, that little, well it was actually a book first but at the end all the spiders kind of flew away."
+  },
+  {
+    "start": 291.16,
+    "end": 295.12,
+    "speaker": "Sebastian",
+    "text": "Okay, thank you, very interesting."
+  },
+  {
+    "start": 297.78,
+    "end": 299.54,
+    "speaker": "Sebastian",
+    "text": "Guillermo, do you want to?"
+  },
+  {
+    "start": 302.26,
+    "end": 311.43,
+    "speaker": "Speaker 3",
+    "text": "Okay, I don't know why, but when I was a child I wanted to be a panther."
+  },
+  {
+    "start": 312.91,
+    "end": 313.79,
+    "speaker": "Speaker 3",
+    "text": "Not a pink panther."
+  },
+  {
+    "start": 314.07,
+    "end": 316.49,
+    "speaker": "Speaker 4",
+    "text": "Maybe it's really difficult to draw a panther."
+  },
+  {
+    "start": 318.11,
+    "end": 318.93,
+    "speaker": "Speaker 4",
+    "text": "It's okay, I don't like it."
+  },
+  {
+    "start": 318.93,
+    "end": 320.29,
+    "speaker": "Sebastian",
+    "text": "It would be very funny for us."
+  },
+  {
+    "start": 337.5,
+    "end": 338.74,
+    "speaker": "Speaker 3",
+    "text": "Okay, it's a friendly panther."
+  },
+  {
+    "start": 340.6,
+    "end": 342.42,
+    "speaker": "Michael",
+    "text": "Maybe it's happy because it just ate someone."
+  },
+  {
+    "start": 353.32,
+    "end": 363.72,
+    "speaker": "Speaker 3",
+    "text": "Actually, honestly, I don't know what's his behavior, I don't know if it's the male who"
+  },
+  {
+    "start": 363.72,
+    "end": 365.1,
+    "speaker": "Speaker 3",
+    "text": "hunts or if it's the female."
+  },
+  {
+    "start": 366.42,
+    "end": 377.2,
+    "speaker": "Speaker 3",
+    "text": "I have watched that lions didn't hunt, it's the female lions who hunt, but I like it because"
+  },
+  {
+    "start": 377.2,
+    "end": 391.96,
+    "speaker": "Speaker 3",
+    "text": "This is fast and it's black as well so it can hide itself very easily and it looks like"
+  },
+  {
+    "start": 393.86,
+    "end": 397.24,
+    "speaker": "Speaker 3",
+    "text": "a powerful, strong..."
+  },
+  {
+    "start": 399.16,
+    "end": 406.76,
+    "speaker": "Speaker 3",
+    "text": "I don't know, I watched a film about a black panther when I was a child and I was in that"
+  },
+  {
+    "start": 406.76,
+    "end": 411.76,
+    "speaker": "Speaker 3",
+    "text": "when everything was choking me a lot okay"
+  },
+  {
+    "start": 411.76,
+    "end": 413.68,
+    "speaker": "Sebastian",
+    "text": "thank you okay I'm sure"
+  },
+  {
+    "start": 426.06,
+    "end": 427.0,
+    "speaker": "Michael",
+    "text": "they don't"
+  },
+  {
+    "start": 427.0,
+    "end": 432.46,
+    "speaker": "Michael",
+    "text": "like pink panthers I like it this"
+  },
+  {
+    "start": 450.28,
+    "end": 453.08,
+    "speaker": "Speaker 4",
+    "text": "lapis coming out once in a while it's not"
+  },
+  {
+    "start": 453.08,
+    "end": 463.12,
+    "speaker": "Speaker 4",
+    "text": "very strong okay so not the favorite animal but I think I'll draw elephant"
+  },
+  {
+    "start": 463.12,
+    "end": 477.61,
+    "speaker": "Speaker 4",
+    "text": "I'll try to draw elephants. Okay, so elephant goes like this. Let's assume and"
+  },
+  {
+    "start": 478.51,
+    "end": 486.22,
+    "speaker": "Speaker 4",
+    "text": "then it has four feet. I don't know whether there's any distance there"
+  },
+  {
+    "start": 486.22,
+    "end": 512.98,
+    "speaker": "Speaker 4",
+    "text": "should be any distance or not but I think this is the easiest. We have its"
+  },
+  {
+    "start": 512.98,
+    "end": 523.5,
+    "speaker": "Speaker 4",
+    "text": "hump. It seems that elephants are pretty friendly and they have one very important way, a different"
+  },
+  {
+    "start": 523.5,
+    "end": 529.7,
+    "speaker": "Speaker 4",
+    "text": "way of walking. So when they walk, wherever they are going to put their first feet, the"
+  },
+  {
+    "start": 529.7,
+    "end": 535.58,
+    "speaker": "Speaker 4",
+    "text": "second feet will always be, when they come to that position, the third feet will be there."
+  },
+  {
+    "start": 535.84,
+    "end": 540.38,
+    "speaker": "Speaker 4",
+    "text": "That's the way they walk. And that's very peculiar about them. None of the other animals"
+  },
+  {
+    "start": 540.38,
+    "end": 547.14,
+    "speaker": "Speaker 4",
+    "text": "walk like this and they are very useful to human beings at least few few hundred"
+  },
+  {
+    "start": 547.14,
+    "end": 550.74,
+    "speaker": "Speaker 4",
+    "text": "years ago when there was no means of transportations or something or when"
+  },
+  {
+    "start": 550.74,
+    "end": 555.54,
+    "speaker": "Speaker 4",
+    "text": "they had to carry huge loads from one place to another elephants were very"
+  },
+  {
+    "start": 555.54,
+    "end": 564.2,
+    "speaker": "Speaker 4",
+    "text": "useful and they are found in usually the warm countries and they are the biggest"
+  },
+  {
+    "start": 564.2,
+    "end": 569.36,
+    "speaker": "Speaker 4",
+    "text": "terrestrial animal that's what I know about them so that's what I wanted to"
+  },
+  {
+    "start": 569.36,
+    "end": 569.62,
+    "speaker": "Speaker 4",
+    "text": "about?"
+  },
+  {
+    "start": 569.88,
+    "end": 573.32,
+    "speaker": "Michael",
+    "text": "So is this an Indian or an African elephant because you haven't drawn for years?"
+  },
+  {
+    "start": 573.32,
+    "end": 573.54,
+    "speaker": "Speaker 4",
+    "text": "There are two"
+  },
+  {
+    "start": 573.54,
+    "end": 579.04,
+    "speaker": "Speaker 4",
+    "text": "kind of yeah they are very different Indian and African elephants. So Indian elephant is having"
+  },
+  {
+    "start": 579.04,
+    "end": 585.2,
+    "speaker": "Speaker 4",
+    "text": "one bump I think and the African have two and then there is a difference in the trunk of the animals"
+  },
+  {
+    "start": 585.2,
+    "end": 594.34,
+    "speaker": "Speaker 4",
+    "text": "these elephants who are Indian and so at some for some elephants it's that trunk is having one"
+  },
+  {
+    "start": 594.34,
+    "end": 596.24,
+    "speaker": "Speaker 4",
+    "text": "Do we have some message there?"
+  },
+  {
+    "start": 596.68,
+    "end": 598.36,
+    "speaker": "Sebastian",
+    "text": "Yes, we have to..."
+  },
+  {
+    "start": 598.36,
+    "end": 599.56,
+    "speaker": "Sebastian",
+    "text": "I have to cut you, sorry."
+  },
+  {
+    "start": 600.76,
+    "end": 602.44,
+    "speaker": "Sebastian",
+    "text": "Some other time. Thank you."
+  },
+  {
+    "start": 602.58,
+    "end": 603.3,
+    "speaker": "Sebastian",
+    "text": "Thank you."
+  },
+  {
+    "start": 603.92,
+    "end": 604.94,
+    "speaker": "Michael",
+    "text": "We can discuss that offline."
+  },
+  {
+    "start": 605.38,
+    "end": 606.78,
+    "speaker": "Sebastian",
+    "text": "Yeah, we'll discuss offline."
+  },
+  {
+    "start": 607.2,
+    "end": 609.54,
+    "speaker": "Sebastian",
+    "text": "Or we'll do another meeting about..."
+  },
+  {
+    "start": 611.16,
+    "end": 615.59,
+    "speaker": "Sebastian",
+    "text": "So, another important part of the project"
+  },
+  {
+    "start": 615.59,
+    "end": 617.07,
+    "speaker": "Sebastian",
+    "text": "is about money."
+  },
+  {
+    "start": 618.25,
+    "end": 619.45,
+    "speaker": "Sebastian",
+    "text": "And about..."
+  },
+  {
+    "start": 619.45,
+    "end": 620.71,
+    "speaker": "Sebastian",
+    "text": "About finances."
+  },
+  {
+    "start": 623.31,
+    "end": 623.91,
+    "speaker": "Sebastian",
+    "text": "So..."
+  },
+  {
+    "start": 623.91,
+    "end": 633.93,
+    "speaker": "Sebastian",
+    "text": "selling price of 25 euro for this remote control and we have which should generate a profit"
+  },
+  {
+    "start": 633.93,
+    "end": 641.73,
+    "speaker": "Sebastian",
+    "text": "of 50 million euros and we should target an international market."
+  },
+  {
+    "start": 642.39,
+    "end": 648.25,
+    "speaker": "Michael",
+    "text": "So could I just ask one question, is this a standalone unit that we're going to be selling"
+  },
+  {
+    "start": 648.25,
+    "end": 652.03,
+    "speaker": "Michael",
+    "text": "so it's going to be you already have a TV but you're buying an extra remote control"
+  },
+  {
+    "start": 652.03,
+    "end": 652.75,
+    "speaker": "Michael",
+    "text": "for it or something?"
+  },
+  {
+    "start": 652.75,
+    "end": 655.69,
+    "speaker": "Sebastian",
+    "text": "But this is the next topic we have to discuss, exactly."
+  },
+  {
+    "start": 656.19,
+    "end": 657.51,
+    "speaker": "Sebastian",
+    "text": "So let's go to it."
+  },
+  {
+    "start": 658.09,
+    "end": 662.41,
+    "speaker": "Sebastian",
+    "text": "So we should decide which kind of remote control"
+  },
+  {
+    "start": 662.41,
+    "end": 665.23,
+    "speaker": "Sebastian",
+    "text": "we want to go."
+  },
+  {
+    "start": 665.57,
+    "end": 670.37,
+    "speaker": "Sebastian",
+    "text": "Should it be specific remote control to some specific device?"
+  },
+  {
+    "start": 670.73,
+    "end": 672.89,
+    "speaker": "Sebastian",
+    "text": "Should it be a universal one?"
+  },
+  {
+    "start": 673.89,
+    "end": 675.11,
+    "speaker": "Sebastian",
+    "text": "And et cetera."
+  },
+  {
+    "start": 677.65,
+    "end": 682.35,
+    "speaker": "Sebastian",
+    "text": "So I'm waiting for your inputs very quickly,"
+  },
+  {
+    "start": 682.35,
+    "end": 685.45,
+    "speaker": "Sebastian",
+    "text": "because we have only three minutes to go."
+  },
+  {
+    "start": 686.73,
+    "end": 694.55,
+    "speaker": "Michael",
+    "text": "Okay, well, so it seems the first thing that they've kind of specified is the price like"
+  },
+  {
+    "start": 694.55,
+    "end": 699.29,
+    "speaker": "Michael",
+    "text": "based on how much profit we want to make, which seems to kind of a little strange if"
+  },
+  {
+    "start": 699.29,
+    "end": 703.65,
+    "speaker": "Michael",
+    "text": "we don't know what the product is yet, but I guess if that's the requirement that we"
+  },
+  {
+    "start": 703.65,
+    "end": 709.55,
+    "speaker": "Michael",
+    "text": "need to design the product to actually fit that price bracket."
+  },
+  {
+    "start": 710.09,
+    "end": 712.85,
+    "speaker": "Michael",
+    "text": "So, I guess we're gonna need to find out what's actually,"
+  },
+  {
+    "start": 713.37,
+    "end": 715.47,
+    "speaker": "Michael",
+    "text": "you know, what people are willing to pay for,"
+  },
+  {
+    "start": 716.89,
+    "end": 719.19,
+    "speaker": "Michael",
+    "text": "what kind of product they're expecting for 25 euro,"
+  },
+  {
+    "start": 719.37,
+    "end": 720.91,
+    "speaker": "Michael",
+    "text": "because it seems quite a lot for remote control."
+  },
+  {
+    "start": 721.05,
+    "end": 721.31,
+    "speaker": "Sebastian",
+    "text": "So, it's-"
+  },
+  {
+    "start": 721.31,
+    "end": 724.39,
+    "speaker": "Sebastian",
+    "text": "Okay, I think this is more a job to our-"
+  },
+  {
+    "start": 724.39,
+    "end": 724.65,
+    "speaker": "Sebastian",
+    "text": "Marketing person."
+  },
+  {
+    "start": 725.01,
+    "end": 725.65,
+    "speaker": "Sebastian",
+    "text": "Marketing person, yeah."
+  },
+  {
+    "start": 726.11,
+    "end": 729.37,
+    "speaker": "Sebastian",
+    "text": "So, it should be the topic of maybe after the next meeting,"
+  },
+  {
+    "start": 729.51,
+    "end": 731.55,
+    "speaker": "Sebastian",
+    "text": "just to have an overview of this,"
+  },
+  {
+    "start": 731.89,
+    "end": 734.23,
+    "speaker": "Sebastian",
+    "text": "and in which direction we should go."
+  },
+  {
+    "start": 734.49,
+    "end": 736.07,
+    "speaker": "Sebastian",
+    "text": "So, we need to close the meeting."
+  },
+  {
+    "start": 736.71,
+    "end": 738.13,
+    "speaker": "Sebastian",
+    "text": "We'll have a new meeting soon,"
+  },
+  {
+    "start": 738.13,
+    "end": 743.29,
+    "speaker": "Sebastian",
+    "text": "And so all the work, every of you have to do."
+  },
+  {
+    "start": 744.75,
+    "end": 748.49,
+    "speaker": "Sebastian",
+    "text": "So you have to work on the working design."
+  },
+  {
+    "start": 749.45,
+    "end": 752.01,
+    "speaker": "Sebastian",
+    "text": "You have to work on the technical functions."
+  },
+  {
+    "start": 752.91,
+    "end": 756.47,
+    "speaker": "Sebastian",
+    "text": "And you have to work on user requirements, specs."
+  },
+  {
+    "start": 757.33,
+    "end": 757.53,
+    "speaker": "Sebastian",
+    "text": "All right."
+  },
+  {
+    "start": 759.69,
+    "end": 762.73,
+    "speaker": "Sebastian",
+    "text": "You will receive some information by email, as usual."
+  },
+  {
+    "start": 763.69,
+    "end": 764.51,
+    "speaker": "Sebastian",
+    "text": "Thanks for coming today."
+  },
+  {
+    "start": 765.01,
+    "end": 765.33,
+    "speaker": "Speaker 4",
+    "text": "Thanks."
+  },
+  {
+    "start": 765.53,
+    "end": 765.71,
+    "speaker": "Speaker 4",
+    "text": "Thanks."
+  },
+  {
+    "start": 765.77,
+    "end": 766.09,
+    "speaker": "Speaker 4",
+    "text": "All right."
+  }
+]

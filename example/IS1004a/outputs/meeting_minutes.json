@@ -1,0 +1,120 @@
+{
+  "participants": [
+    {
+      "name": "Sebastian",
+      "role": "project manager"
+    },
+    {
+      "name": "Michael",
+      "role": "user interface designer"
+    },
+    {
+      "name": "Speaker 3",
+      "role": null
+    },
+    {
+      "name": "Speaker 4",
+      "role": null
+    }
+  ],
+  "summary": "The kickoff meeting introduced a new remote‑control project with a target selling price of €25, a profit goal of €50 million and an international market focus. The team reviewed the project phases and tools, and each member was assigned to start work on design, technical functions and user requirements. No concrete decisions on the remote’s type were made, and further market research was identified as needed. The meeting ended with plans for follow‑up sessions and email distribution of information.",
+  "discussion_points": [
+    "Introductions and role statements",
+    "Agenda overview and tool training",
+    "Project goal and methodology explained",
+    "Whiteboard drawing exercise",
+    "Discussion of project finances (price, profit, market)",
+    "Open question on remote‑control type",
+    "Assignment of work items and next steps"
+  ],
+  "given": [
+    {
+      "fact": "The selling price for the remote control is set at 25 euros.",
+      "evidence": [
+        {
+          "role": "given",
+          "quote": "selling price of 25 euro for this remote control",
+          "speaker": "Sebastian",
+          "time": "10:23.91",
+          "line": 93
+        }
+      ]
+    },
+    {
+      "fact": "The project should generate a profit of 50 million euros.",
+      "evidence": [
+        {
+          "role": "given",
+          "quote": "should generate a profit of 50 million euros",
+          "speaker": "Sebastian",
+          "time": "10:23.91",
+          "line": 93
+        }
+      ]
+    },
+    {
+      "fact": "The target market is international.",
+      "evidence": [
+        {
+          "role": "given",
+          "quote": "we should target an international market",
+          "speaker": "Sebastian",
+          "time": "10:33.93",
+          "line": 94
+        }
+      ]
+    }
+  ],
+  "assessments": [],
+  "proposals_not_decided": [],
+  "open_questions": [
+    {
+      "question": "Should the remote control be specific to a device or universal?",
+      "evidence": [
+        {
+          "role": "open question",
+          "quote": "Should it be specific remote control to some specific device? Should it be a universal one?",
+          "speaker": "Sebastian",
+          "time": "11:05.57",
+          "line": 102
+        }
+      ]
+    },
+    {
+      "question": "What are customers’ expectations and willingness to pay for a €25 remote control?",
+      "evidence": [
+        {
+          "role": "open question",
+          "quote": "we need to find out what's actually, you know, what people are willing to pay for, what kind of product they're expecting for 25 euro",
+          "speaker": "Michael",
+          "time": "11:50.09",
+          "line": 111
+        }
+      ]
+    },
+    {
+      "question": "What direction should the marketing strategy take for this product?",
+      "evidence": [
+        {
+          "role": "open question",
+          "quote": "Marketing person, yeah. So, it should be the topic of maybe after the next meeting, just to have an overview of this, and in which direction we should go.",
+          "speaker": "Sebastian",
+          "time": "12:05.01",
+          "line": 118
+        }
+      ]
+    },
+    {
+      "question": "Details of the elephant drawing discussion were left unresolved.",
+      "evidence": [
+        {
+          "role": "open question",
+          "quote": "We can discuss that offline.",
+          "speaker": "Michael",
+          "time": "10:03.92",
+          "line": 85
+        }
+      ]
+    }
+  ]
+}

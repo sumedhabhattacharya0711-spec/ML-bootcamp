@@ -1,0 +1,22 @@
+# Action items
+
+- Send the final color samples.
+  - owner: Emma
+  - deadline: by Friday
+  - status: agreed
+  - [01:50.62] Daniel, task: "Emma, can you send the final color samples?"
+  - [01:54.86] Emma, owner: "Yes, I'll send the color samples by Friday."
+  - [01:54.86] Emma, deadline: "by Friday"
+- Finish the model evaluation report.
+  - owner: Raj
+  - deadline: by next Wednesday
+  - status: agreed
+  - [01:59.30] Raj, task: "And I'll finish the model evaluation report by next Wednesday."
+  - [01:59.30] Raj, deadline: "by next Wednesday"
+- Prepare the launch video.
+  - owner: Chloe
+  - deadline: by the end of May
+  - status: agreed
+  - [02:05.00] Daniel, task: "The marketing lead will prepare the launch video by the end of May."
+  - [02:05.00] Daniel, deadline: "by the end of May"
+  - [02:10.84] Chloe, owner: "Sure. I'll take that on."

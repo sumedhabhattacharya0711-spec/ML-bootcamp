@@ -29,6 +29,8 @@ An AI meeting assistant that turns a recorded meeting into an accurate, speaker-
 
 The rule that runs through the whole design: **models make the judgment calls, plain Python checks their work at every hand-off.** Nothing a model produces reaches the record without a deterministic check behind it.
 
+A two-page summary of the models and the data flow is in [`docs/TECHNICAL_DESCRIPTION.md`](docs/TECHNICAL_DESCRIPTION.md); example meetings with the outputs the app produced are in [`example/IS1004a/`](example/IS1004a/) (a real AMI recording) and [`example/PL1001a/`](example/PL1001a/) (a short product launch meeting that shows every feature).
+
 ---
 
 ## Contents
@@ -153,7 +155,7 @@ For a permanent public deployment, the same `app.py` runs on any machine or serv
 ### 1.6 Check the installation
 
 ```bash
-pytest -m "not slow"        # 169 fast tests with a fake Whisper, a fake diarizer and a fake LLM, a few seconds
+pytest -m "not slow"        # 186 fast tests with a fake Whisper, a fake diarizer and a fake LLM, a few seconds
 pytest                      # also runs the one slow test with real Whisper (needs the sample clip below)
 ```
 
@@ -206,8 +208,8 @@ Upload `ES2004a.Mix-Headset.wav` in the app and set **Number of speakers** to 4.
 | A proposal is never presented as an agreed decision | Stage 3: status is set by Python, "agreed" only with a verified agreement quote from someone other than the proposer; points stated as settled without objection are labelled "decided, no objection", never "agreed" |
 | Unsupported, empty or unreadable files get a clear error | `stt.check_audio()`, shown in the status table |
 | Clear processing or failure status | per-stage status table: waiting, running, done, failed, skipped, with time and message |
-| Human-readable and machine-readable record with the same content | `minutes.md` and `minutes.json`, both rendered from one pydantic object |
-| Download of the outputs | Files tab |
+| Human-readable and machine-readable record with the same content | every deliverable as `.md`/`.txt` and `.json`, both rendered from the same objects (a test checks they agree) |
+| Download of the outputs | Files tab: the `deliverables/` folder (each output as readable and structured file) and `deliverables.zip` |
 | No prewritten or hardcoded outputs | every output comes from the pipeline run on the uploaded audio |
 | Models and their roles identified | the table at the top of this README, and the app header |
 | Prompts included | `prompts/` |
@@ -417,7 +419,7 @@ Every claim and its verdict is shown in the Details tab and saved in `speakers.j
 
 ### 7.3 Editing names
 
-Automatic names can be wrong, and a speaker nobody names stays "Speaker N". In the **Speakers** tab you can type any name (and role) and press **Apply names**. This renames the speaker in the transcripts, the meeting record (summary, minutes, owners, evidence) and the saved files, without running Whisper or any LLM again. Quotes stay word for word as spoken. Giving two speakers the same name merges them (useful when diarization split one person in two); clearing a name goes back to "Speaker N". `pipeline.rename_speakers(result, {"S2": "Rahul"})` does the same from Python.
+Automatic names can be wrong, and a speaker nobody names stays "Speaker N". In the **Speakers** tab you can type any name (and role) and press **Apply names**. This renames the speaker in the transcripts, the meeting record (summary, minutes, owners, evidence) and the saved files, without running Whisper or any LLM again. Quotes stay word for word as spoken. Python's checks are rerun on the stored LLM answer with the new names, so statuses stay correct: merging two speakers can turn an "agreed" decision into the proposer agreeing with themself, which no longer counts. Giving two speakers the same name merges them (useful when diarization split one person in two); clearing a name goes back to "Speaker N". `pipeline.rename_speakers(result, {"S2": "Rahul"})` does the same from Python.
 
 ### 7.4 What the record gains
 
@@ -500,6 +502,7 @@ Following Fernández et al. 2008, *Modelling and Detecting Decisions in Multi-pa
 given            fact, quote                     (brief, budget, targets handed to the meeting)
 summary          3 to 6 sentences
 minutes          main topics, one line each
+assessments      topic, verdict, quote           (ratings and evaluations: not decisions)
 decisions        text, proposal_quote, agreement_quotes[], rejection_quotes[], settled_quote
 action_items     task, task_quote, owner, owner_quote, deadline, deadline_quote, agreement_quote
 open_questions   question, quote
@@ -512,15 +515,16 @@ It is called with the pydantic schema as the response format, so the provider co
 - **Quote check:** every quote is looked up in the transcript (`rapidfuzz.partial_ratio` ≥ 90) and mapped to its line and timestamp. An item whose main quote is not found is **dropped**. Doubtful lines never count as evidence.
 - **Decision status:**
   - `agreed`: a verified agreement quote exists. A lone backchannel ("mm hmm", "yeah", "okay" …) does not count, nor does the proposer agreeing with themself.
-  - `uncontested`, shown as **"decided, no objection"**: nobody explicitly agreed, but the point was stated as settled ("so the selling price is 25 euro", "we're going with rubber") and no verified objection came after it. Hedged wording ("maybe", "I think", "what about", a question) never counts. This is kept apart from `agreed` on purpose: it records that nobody objected, not that people agreed.
+  - `uncontested`, shown as **"decided, no objection"**: nobody explicitly agreed, but the point was stated as settled ("so the selling price is 25 euro", "we're going with rubber") and no verified objection came after it. Hedged wording ("maybe", "I think", "what about", a question) never counts, and a negated statement settles only a decision that is itself negative ("we're not going with a touch screen" settles "no touch screen", never "use a touch screen"). A decision announced in one line, with no proposal before it ("So the case will be blue"), uses the announcement as its proposal. This is kept apart from `agreed` on purpose: it records that nobody objected, not that people agreed.
   - `rejected`: a verified rejection quote exists (and is the latest word).
   - `open`: anything else. Open proposals are listed, never shown as decisions.
 - **Given facts:** facts the meeting was handed rather than decided (the project brief, prices, profit targets, cost limits) are listed in their own **Given** section, each with a checked quote, so they do not inflate the decisions.
+- **Assessments:** ratings and evaluations of something that already exists ("easy to use: 6 for me", "it's very promising") are listed under **Assessments**, each with a checked quote. In evaluation meetings they used to be reported as "agreed" decisions (13 of them in two AMI meetings); a decision is a choice about what to do or how the product will be.
 - **Owners and deadlines:** kept only if a verified quote supports them, otherwise `"unspecified"`.
 - **Action-item status:** `agreed` (named owner plus a verified acceptance), `proposed` (owner named but nobody verifiably took it on), `unassigned` (no supported owner).
 - **Evidence:** each item keeps all its verified quotes with role (proposal, agreement, rejection, task, owner, deadline), line number and start time.
 
-Everything that was removed or downgraded is listed with the reason, and counted in a **faithfulness report** (decisions proposed / kept / agreed / uncontested, action items proposed / kept / agreed, given facts proposed / kept, owners and deadlines removed, owners found from a speaker or a role, quotes ignored, evidence support rate, refinement edits applied and blocked, speakers found / named / with a role).
+Everything that was removed or downgraded is listed with the reason, and counted in a **faithfulness report** (decisions proposed / kept / agreed / uncontested, action items proposed / kept / agreed, given facts and assessments proposed / kept, owners and deadlines removed, owners found from a speaker or a role, quotes ignored, evidence support rate, refinement edits applied and blocked, speakers found / named / with a role).
 
 ### 9.3 Long meetings
 
@@ -572,13 +576,14 @@ Each stage has a status (waiting, running, done, failed, skipped), a message and
 
 | File | Contents |
 |---|---|
+| `deliverables/` and `deliverables.zip` | the required outputs, see [section 13](#13-outputs) |
 | `transcript_raw.txt` | Whisper's output; with speakers, one `[mm:ss.ss] Name: text` line per segment |
 | `transcript_refined.txt` | after Stage 2 |
 | `speakers.json` | speakers (name, how found, confidence, talk time), every name claim with its verdict, the speaker turns |
 | `edit_log.json` | every edit, applied or blocked, with reasons; hints with scores |
 | `minutes.md` | the readable record |
 | `minutes.json` | the structured record |
-| `run.json` | stage statuses, timings, settings, model names, glossary, flags, LLM usage, faithfulness report |
+| `run.json` | the recording's file name, stage statuses, timings, settings, model names, glossary, flags, speakers, LLM usage, faithfulness report |
 
 ---
 
@@ -597,10 +602,37 @@ Each stage has a status (waiting, running, done, failed, skipped), a message and
 
 ## 13. Outputs
 
-For each recording the app displays and lets you download:
+**File:** `src/meeting_assistant/deliverables.py`
 
-| Output | Contents |
-|---|---|
+An example run, with the recording, is in [`example/IS1004a/`](example/IS1004a/). Every run writes the required outputs to `runs/<date-time>/deliverables/`, each in a human-readable and a machine-readable file rendered from the same objects, so both carry the same content. `runs/<date-time>/deliverables.zip` holds all of them for one download; the app's Files tab lists them first.
+
+| Output | Human-readable | Machine-readable | Contents |
+|---|---|---|---|
+| Raw transcript | `raw_transcript.txt` | `raw_transcript.json` | the speech-to-text result before refinement: one `[mm:ss.ss] Speaker: text` line per segment (start, end, speaker, text in JSON) |
+| Refined transcript | `refined_transcript.txt` | `refined_transcript.json` | the same after domain-term correction (every edit is in `edit_log.json`) |
+| Meeting minutes | `meeting_minutes.md` | `meeting_minutes.json` | participants and roles, a concise summary, the main discussion points, given facts (brief, budget, targets), assessments (ratings, evaluations), proposals not decided, open questions |
+| Key decisions | `key_decisions.md` | `key_decisions.json` | the decisions reached ("agreed", or "decided, no objection"), each with timestamped quotes and speakers; `[]` if none were reached |
+| Action items | `action_items.md` | `action_items.json` | task, owner and deadline as stated (otherwise "unspecified"), status and quotes; `[]` if none were assigned |
+
+Open and rejected proposals are not decisions reached: they are listed in the minutes under "Proposals not decided". If a stage fails, its files are left out and `deliverables/STATUS.txt` says why, so a missing record is never mistaken for an empty one. Renaming speakers rewrites the folder.
+
+`key_decisions.md` example:
+
+```markdown
+# Key decisions
+
+- **agreed**: Keep it
+  - [00:02.00] Priya, proposal: "I propose we keep it"
+  - [00:04.00] Rahul, agreement: "Yes, let's keep it"
+```
+
+`action_items.json` when nothing was assigned:
+
+```json
+[]
+```
+
+---|---|
 | Raw transcript | the speech-to-text result before refinement |
 | Refined transcript | after domain-term correction, with every edit logged |
 | Meeting minutes | a concise summary and the main topics in order |
@@ -636,6 +668,7 @@ All settings live in `.env` (copy `.env.example`):
 | `LLM_GEMINI_MODEL` | `gemini-2.5-flash` | backup model (any model your key lists) |
 | `LLM_CACHE` | on | `0` disables the answer cache |
 | `MINUTES_SEGMENT_TOKENS` | `4000` | transcript size above which Stage 3 splits by topic |
+| `MINUTES_REASONING_EFFORT` | `low` | reasoning effort for the meeting-record call (`low`, `medium` or `high`) |
 | `HF_TOKEN` | (empty) | Hugging Face token for speaker diarization; empty = no speakers |
 | `DIARIZATION_MODEL` | `pyannote/speaker-diarization-community-1` | another pyannote pipeline, e.g. `pyannote/speaker-diarization-3.1` |
 
@@ -674,12 +707,16 @@ ML-bootcamp/
 │   ├── speakers.py             Stage 1a/2b: diarization, speaker per line, names, renaming
 │   ├── llm.py                  providers, fallback, retries, cache
 │   ├── pipeline.py             runs the stages in order, saves runs
+│   ├── deliverables.py         the required outputs, readable and structured, per run
 │   └── paths.py                project folders
 ├── data/
 │   ├── glossary/ml_tech.txt    a preset word pack
 │   └── hallucination/          BoH.csv and its licence
+├── eval/score_ami.py           accuracy against AMI's manual annotations (section 16.1)
 ├── tests/                      pytest suite (fake Whisper and fake LLM)
-├── docs/                       development notes, README images
+├── docs/                       technical description (TECHNICAL_DESCRIPTION.md), development notes, README images
+├── example/IS1004a/            a shareable AMI meeting and the outputs the app produced for it
+├── example/PL1001a/            a short product launch meeting and its outputs
 └── runs/                       one folder per run (created automatically)
 ```
 
@@ -688,7 +725,7 @@ ML-bootcamp/
 ## 16. Tests
 
 ```bash
-pytest -m "not slow"   # 169 tests, a few seconds, no GPU or API key needed
+pytest -m "not slow"   # 186 tests, a few seconds, no GPU or API key needed
 pytest                 # plus 1 slow test with real Whisper
 ```
 
@@ -705,6 +742,44 @@ The tests cover the deterministic parts with a fake Whisper and a fake LLM; LLM 
 | `test_segment.py` | long transcripts split at topic changes, within the size budget |
 | `test_llm.py` | fallback to Gemini on rate limits, no fallback on a bad key, cut-off answers retried with a larger limit, rejected settings dropped |
 | `test_pipeline.py` | speakers found, named and used in the record; renaming rewrites the files; diarization or naming failures carry on; a full run saves every file; bad audio skips later stages; a Stage 2 failure still writes minutes; a Stage 3 failure keeps both transcripts |
+
+### 16.1 Accuracy on real meetings
+
+Measured on six AMI meetings from three sites (Edinburgh ES, Idiap IS, TNO TS), Whisper medium, **Number of speakers = 4**, against AMI's manual transcripts and speaker segments. `eval/score_ami.py` computes every number below from a saved run.
+
+| Meeting | Length | WER | DER (standard) | DER (strict) | Words with the right speaker | Speakers named, correct |
+|---|---|---|---|---|---|---|
+| ES2004a | 17.5 min | 28.6% | 9.4% | 29.7% | 90.9% | 1 / 1 |
+| IS1009a | 14.0 min | 27.6% | 8.0% | 27.5% | 88.9% | 4 / 4 |
+| TS3003a | 25.1 min | 23.2% | 14.0% | 27.8% | 94.9% | 1 / 1 |
+| ES2014a | 19.2 min | 29.4% | 11.6% | 28.1% | 95.1% | 4 / 4 |
+| ES2010a | 10.7 min | 25.8% | 12.0% | 26.8% | 91.4% | 1 / 1 |
+| IS1004a | 13.3 min | 24.9% | 10.3% | 19.5% | 95.9% | 2 / 2 |
+| **Average** | | **26.6%** | **10.9%** | **26.6%** | **92.8%** | **13 / 13** |
+
+- **WER** (word error rate): Whisper's words against AMI's transcript, lowercase, punctuation removed. AMI keeps every "um" and "uh", which Whisper leaves out; most remaining errors are words lost where people talk over each other in the mixed recording.
+- **DER** (diarization error rate) = (missed speech + false alarm + speaker confusion) / speech time. *Standard*: 0.25 s collar, overlapping speech not scored (the usual setup). *Strict*: no collar, overlap scored; almost all of the difference is overlapping speech that gets no speaker. Speaker confusion alone was 0.5 to 2.5%.
+- **Words with the right speaker**: share of transcript words whose speaker matches AMI's, after the best one-to-one mapping of our speakers to AMI's.
+- **Speakers named, correct**: a name is correct when AMI says the introduction it came from was said by the person that speaker maps to. Speakers who never said their name stay "Speaker N" and are not counted.
+
+These are six meetings of one corpus (scripted design meetings, four speakers, headset mix), not a benchmark.
+
+To reproduce:
+
+```bash
+# 1. a meeting (see 1.7) and AMI's manual annotations (22 MB)
+curl -L -o data/audio/IS1009a.Mix-Headset.wav \
+  https://groups.inf.ed.ac.uk/ami/AMICorpusMirror/amicorpus/IS1009a/audio/IS1009a.Mix-Headset.wav
+curl -L -o data/ami_annotations.zip \
+  https://groups.inf.ed.ac.uk/ami/AMICorpusAnnotations/ami_public_manual_1.6.2.zip
+unzip -q data/ami_annotations.zip -d data/ami_annotations
+
+# 2. a run with 4 speakers (or the app with Number of speakers = 4)
+python -m meeting_assistant.pipeline data/audio/IS1009a.Mix-Headset.wav --speakers 4
+
+# 3. score it (add --record to see the record next to AMI's summary)
+python eval/score_ami.py runs/<the run folder printed above>
+```
 
 ---
 
@@ -745,7 +820,7 @@ python -m meeting_assistant.llm --models   # lists the models your key can use
 
 ## 19. Known limitations
 
-- **Speaker labels are only as good as diarization.** pyannote reports about 18.8% DER on AMI headset-mix audio for its 3.1 pipeline (its own figure, not ours); similar voices, overlapping speech and very short turns are the hard cases. We have not measured DER on our own clips yet; AMI's speaker annotations would allow it.
+- **Speaker labels are only as good as diarization.** pyannote reports about 18.8% DER on AMI headset-mix audio for its 3.1 pipeline (its own figure, not ours); similar voices, overlapping speech and very short turns are the hard cases. Our own measurement on six AMI meetings is in [section 16.1](#161-accuracy-on-real-meetings): 10.9% DER (standard scoring) and 92.8% of words with the right speaker.
 - **A speaker nobody names stays "Speaker N"** until you type a name. Names come only from introductions and people being addressed, never from guesses about roles.
 - **The speaker model needs a Hugging Face token**, adds PyTorch (~2-3 GB) to the install and uses up to ~1 GB of GPU memory next to Whisper.
 - **The guard cannot stop a wrong edit that produces a real glossary term.** That is why weak hints are not sent at all (the 82 threshold).

@@ -1,0 +1,170 @@
+[
+  {
+    "start": 0.3,
+    "end": 4.9,
+    "speaker": "Daniel",
+    "text": "Good morning, everyone. I'm Daniel the project manager"
+  },
+  {
+    "start": 5.54,
+    "end": 9.28,
+    "speaker": "Daniel",
+    "text": "Today we need to finalize the launch plan for our smart thermostat."
+  },
+  {
+    "start": 10.66,
+    "end": 14.14,
+    "speaker": "Emma",
+    "text": "Hi everyone. I'm Emma the product designer"
+  },
+  {
+    "start": 15.34,
+    "end": 18.12,
+    "speaker": "Daniel",
+    "text": "Raj would you like to introduce yourself?"
+  },
+  {
+    "start": 20.36,
+    "end": 20.68,
+    "speaker": "Raj",
+    "text": "sure"
+  },
+  {
+    "start": 20.68,
+    "end": 25.4,
+    "speaker": "Raj",
+    "text": "I'm Raj the machine learning engineer. I"
+  },
+  {
+    "start": 25.4,
+    "end": 27.56,
+    "speaker": "Raj",
+    "text": "build the temperature prediction model"
+  },
+  {
+    "start": 28.87,
+    "end": 31.97,
+    "speaker": "Chloe",
+    "text": "and I'm Chloe the marketing lead"
+  },
+  {
+    "start": 33.87,
+    "end": 38.79,
+    "speaker": "Daniel",
+    "text": "Thanks, Chloe. First, the brief from management."
+  },
+  {
+    "start": 40.61,
+    "end": 46.35,
+    "speaker": "Daniel",
+    "text": "The launch date is the 1st of June. And our budget is 80,000 euro."
+  },
+  {
+    "start": 48.17,
+    "end": 54.95,
+    "speaker": "Raj",
+    "text": "Good news on testing. The prototype tested really well, 9 out of 10 users liked it."
+  },
+  {
+    "start": 56.82,
+    "end": 58.78,
+    "speaker": "Daniel",
+    "text": "Thanks, Raj. That's great news."
+  },
+  {
+    "start": 60.86,
+    "end": 63.62,
+    "speaker": "Emma",
+    "text": "I propose we ship the thermostat in matte white."
+  },
+  {
+    "start": 64.92,
+    "end": 69.56,
+    "speaker": "Raj",
+    "text": "Yes, Mate White looks great. Let's go with that."
+  },
+  {
+    "start": 71.59,
+    "end": 73.39,
+    "speaker": "Chloe",
+    "text": "Should we also offer a Gold Edition?"
+  },
+  {
+    "start": 75.45,
+    "end": 80.67,
+    "speaker": "Daniel",
+    "text": "No, a Gold Edition is too expensive for the first launch. Let's drop that."
+  },
+  {
+    "start": 82.51,
+    "end": 88.45,
+    "speaker": "Raj",
+    "text": "For the model, we train on Kubeflow and deploy it on the device with ONNX."
+  },
+  {
+    "start": 90.13,
+    "end": 94.23,
+    "speaker": "Daniel",
+    "text": "Okay. So the app will support both iPhone and Android."
+  },
+  {
+    "start": 96.06,
+    "end": 98.8,
+    "speaker": "Chloe",
+    "text": "Maybe we could add voice control later."
+  },
+  {
+    "start": 100.85,
+    "end": 102.87,
+    "speaker": "Daniel",
+    "text": "We still need to decide the price for Europe."
+  },
+  {
+    "start": 103.83,
+    "end": 106.39,
+    "speaker": "Daniel",
+    "text": "Let's leave that open until we have the cost report."
+  },
+  {
+    "start": 108.5,
+    "end": 109.54,
+    "speaker": "Daniel",
+    "text": "Now the tasks."
+  },
+  {
+    "start": 110.62,
+    "end": 112.82,
+    "speaker": "Daniel",
+    "text": "Emma, can you send the final color samples?"
+  },
+  {
+    "start": 114.86,
+    "end": 117.7,
+    "speaker": "Emma",
+    "text": "Yes, I'll send the color samples by Friday."
+  },
+  {
+    "start": 119.3,
+    "end": 123.4,
+    "speaker": "Raj",
+    "text": "And I'll finish the model evaluation report by next Wednesday."
+  },
+  {
+    "start": 125.0,
+    "end": 128.9,
+    "speaker": "Daniel",
+    "text": "The marketing lead will prepare the launch video by the end of May."
+  },
+  {
+    "start": 130.84,
+    "end": 132.62,
+    "speaker": "Chloe",
+    "text": "Sure. I'll take that on."
+  },
+  {
+    "start": 134.55,
+    "end": 137.83,
+    "speaker": "Daniel",
+    "text": "Great. Thanks everyone. See you next week."
+  }
+]
