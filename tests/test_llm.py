@@ -33,13 +33,30 @@ class FakeCompletions:
     create = parse = _next
 
 
+def fake_client(completions):
+    return SimpleNamespace(chat=SimpleNamespace(completions=completions))
+
+
 @pytest.fixture
 def fake(monkeypatch):
+    """Groq answers with `replies`; no Gemini backup configured."""
     def install(*replies):
         completions = FakeCompletions(replies)
-        monkeypatch.setattr(llm, "get_client", lambda: SimpleNamespace(
-            chat=SimpleNamespace(completions=completions)))
+        monkeypatch.delenv("LLM_GEMINI_KEY", raising=False)
+        monkeypatch.setattr(llm, "get_client", lambda provider: fake_client(completions))
         return completions
+    return install
+
+
+@pytest.fixture
+def fake_both(monkeypatch):
+    """Groq answers with `groq_replies`, Gemini with `gemini_replies`."""
+    def install(groq_replies, gemini_replies):
+        groq, gemini = FakeCompletions(groq_replies), FakeCompletions(gemini_replies)
+        monkeypatch.setenv("LLM_GEMINI_KEY", "test-key")
+        monkeypatch.setattr(llm, "get_client", lambda provider: fake_client(
+            groq if provider is llm.PRIMARY else gemini))
+        return groq, gemini
     return install
 
 
@@ -52,7 +69,7 @@ def test_missing_key(monkeypatch):
     monkeypatch.setenv("LLM_API_KEY", "")
     llm.get_client.cache_clear()
     with pytest.raises(llm.LLMError, match="LLM_API_KEY is not set"):
-        llm.get_client()
+        llm.get_client(llm.PRIMARY)
     llm.get_client.cache_clear()
 
 
@@ -121,3 +138,26 @@ def test_structured_validation_error_twice_is_friendly(fake):
     fake(validation_error(), validation_error())
     with pytest.raises(llm.LLMError, match="failed validation: owner: Field required"):
         llm.call_llm_structured("sys", "user", Answer)
+
+
+def test_rate_limited_groq_falls_back_to_gemini(fake_both):
+    groq, gemini = fake_both([api_error(openai.RateLimitError, "rate limited", 429)],
+                             [fake_response("from gemini")])
+    assert llm.call_llm("sys", "user") == "from gemini"
+    assert gemini.calls[0]["model"] == llm.BACKUP.model
+    assert llm.usage_log[-1].provider == "gemini"
+
+
+def test_bad_groq_key_does_not_fall_back(fake_both):
+    groq, gemini = fake_both([api_error(openai.AuthenticationError, "bad key", 401)],
+                             [fake_response("from gemini")])
+    with pytest.raises(llm.LLMError, match="groq: the API key was rejected"):
+        llm.call_llm("sys", "user")
+    assert gemini.calls == []
+
+
+def test_both_providers_failing_gives_one_error(fake_both):
+    fake_both([api_error(openai.RateLimitError, "rate limited", 429)],
+              [api_error(openai.InternalServerError, "down", 503)])
+    with pytest.raises(llm.LLMError, match="groq: rate limited.*gemini: error 503"):
+        llm.call_llm("sys", "user")

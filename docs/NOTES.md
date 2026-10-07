@@ -126,3 +126,22 @@ was checked with the full test suite plus real runs on the AMI ES2004a clip.
   `build_glossary`); avoiding that needs a change to glossary.py's API, and
   reading a few short text files twice is harmless.
 - **Tests:** 2 new (unknown pack gives a status; failed run is saved).
+
+### Batch G: Groq main provider, Gemini backup (llm.py)
+
+- **Before:** llm.py defaulted to OpenAI (`gpt-4.1`) with an optional
+  `LLM_BASE_URL`; no backup provider.
+- **Now:** Groq is the default main provider (`openai/gpt-oss-120b` at
+  Groq's OpenAI-compatible URL; `LLM_BASE_URL` / `LLM_MODEL` still override).
+  Gemini is the backup (`LLM_GEMINI_KEY`, model `gemini-3.8-flash` unless
+  `LLM_GEMINI_MODEL` is set) through Gemini's OpenAI-compatible endpoint.
+- **When the backup is used:** rate limit, quota exceeded, timeout, connection
+  error or 5xx from Groq, and only if `LLM_GEMINI_KEY` is set. A bad key, a
+  bad request or a missing model does not fall back, so setup errors stay
+  visible. If both fail, one `LLMError` lists both reasons, e.g.
+  "LLM call failed: groq: rate limited ... | gemini: error 503 ...".
+- `usage_log` entries record which provider answered (`run.json` shows it).
+- `.env.example` documents all five LLM settings.
+- **Checks:** 3 new tests (rate-limited Groq falls back; bad Groq key does
+  not; both failing gives one error). Live: with Groq made unreachable on
+  purpose, the test call was answered by Gemini; normal runs use Groq.

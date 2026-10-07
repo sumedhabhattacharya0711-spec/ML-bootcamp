@@ -1,4 +1,10 @@
-"""The one place that talks to the LLM provider (OpenAI).
+"""The one place that talks to the LLM providers.
+
+Groq is the main provider and Gemini the backup. Both are reached through their
+OpenAI-compatible APIs, so one client library covers them. If Groq is rate
+limited, out of quota, down or unreachable, the same call goes to Gemini (when
+LLM_GEMINI_KEY is set). Setup errors (bad key, bad request) are not retried
+elsewhere, so they stay visible.
 
 call_llm(system, user)                    -> reply text       (glossary.py, refine.py)
 call_llm_structured(system, user, Model)  -> pydantic object  (minutes.py)
@@ -28,8 +34,8 @@ load_dotenv(PROJECT_DIR / ".env")
 
 # ---------- Settings (move to config.yaml later) ----------
 
-MODEL = os.getenv("LLM_MODEL", "gpt-4.1")  # non-reasoning model: accepts temperature 0
-BASE_URL = os.getenv("LLM_BASE_URL") or None  # any OpenAI-compatible API, e.g. Groq; None = OpenAI
+GROQ_URL = "https://api.groq.com/openai/v1"
+GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/openai/"
 TEMPERATURE = 0
 TIMEOUT_S = 60
 MAX_RETRIES = 3  # retries rate limits, timeouts and server errors, waiting as long as the
@@ -39,12 +45,31 @@ MAX_RETRIES = 3  # retries rate limits, timeouts and server errors, waiting as l
 _no_temperature: set[str] = set()
 
 
+@dataclass(frozen=True)
+class Provider:
+    name: str
+    key_env: str   # the .env variable holding this provider's API key
+    base_url: str
+    model: str
+
+
+PRIMARY = Provider("groq", "LLM_API_KEY", os.getenv("LLM_BASE_URL") or GROQ_URL,
+                   os.getenv("LLM_MODEL", "openai/gpt-oss-120b"))
+BACKUP = Provider("gemini", "LLM_GEMINI_KEY", GEMINI_URL,
+                  os.getenv("LLM_GEMINI_MODEL", "gemini-3.8-flash"))
+
+# Temporary provider problems: worth trying the backup.
+FALLBACK_ERRORS = (openai.RateLimitError, openai.APITimeoutError,
+                   openai.APIConnectionError, openai.InternalServerError)
+
+
 class LLMError(Exception):
     """An LLM failure. The message is shown to the user as is."""
 
 
 @dataclass
 class LLMUsage:
+    provider: str
     model: str
     input_tokens: int
     output_tokens: int
@@ -55,41 +80,61 @@ class LLMUsage:
 usage_log: list[LLMUsage] = []
 
 
-@lru_cache(maxsize=1)
-def get_client() -> openai.OpenAI:
-    """Create the OpenAI client once and reuse it."""
-    key = os.getenv("LLM_API_KEY", "").strip()
+@lru_cache(maxsize=None)
+def get_client(provider: Provider) -> openai.OpenAI:
+    """Create each provider's client once and reuse it."""
+    key = os.getenv(provider.key_env, "").strip()
     if not key:
-        raise LLMError("LLM_API_KEY is not set. Add it to the .env file in the project folder.")
-    return openai.OpenAI(api_key=key, base_url=BASE_URL, timeout=TIMEOUT_S, max_retries=MAX_RETRIES)
+        raise LLMError(f"{provider.key_env} is not set. Add it to the .env file in the project folder.")
+    return openai.OpenAI(api_key=key, base_url=provider.base_url, timeout=TIMEOUT_S,
+                         max_retries=MAX_RETRIES)
 
 
-def _friendly(e: Exception) -> LLMError:
+def _friendly(e: Exception, provider: Provider, model: str) -> str:
     """Turn an openai exception into a message a user can act on."""
+    return f"{provider.name}: {_reason(e, provider, model)}"
+
+
+def _reason(e: Exception, provider: Provider, model: str) -> str:
     if isinstance(e, openai.AuthenticationError):
-        return LLMError("LLM call failed: the API key was rejected (check LLM_API_KEY in .env).")
+        return f"the API key was rejected (check {provider.key_env} in .env)."
     if isinstance(e, openai.RateLimitError):
         if "insufficient_quota" in str(e):
-            return LLMError("LLM call failed: quota exceeded (add credit / billing on the LLM provider account).")
-        return LLMError("LLM call failed: rate limited by the LLM provider, try again in a minute.")
+            return "quota exceeded (add credit / billing on the provider account)."
+        return "rate limited, try again in a minute."
     if isinstance(e, openai.APITimeoutError):
-        return LLMError(f"LLM call failed: no response after {TIMEOUT_S} s.")
+        return f"no response after {TIMEOUT_S} s."
     if isinstance(e, openai.APIConnectionError):
-        return LLMError("LLM call failed: could not reach the LLM API (check the internet connection).")
+        return "could not reach the API (check the internet connection)."
     if isinstance(e, openai.NotFoundError):
-        return LLMError(f"LLM call failed: model not found or not available to this key: {MODEL}")
+        return f"model not found or not available to this key: {model}"
     if isinstance(e, openai.LengthFinishReasonError):
-        return LLMError("LLM call failed: the answer was cut off because it was too long.")
+        return "the answer was cut off because it was too long."
     if isinstance(e, openai.APIStatusError):
-        return LLMError(f"LLM call failed ({e.status_code}): {e.message}")
-    return LLMError(f"LLM call failed: {e}")
+        return f"error {e.status_code}: {e.message}"
+    return str(e)
 
 
-def _send(method: str, system: str, user: str, model: str, **kwargs):
-    """Send one request with chat.completions.<method> ("create" or "parse"),
-    record usage, and convert errors. Retries once without temperature if the
-    model rejects it."""
-    client = get_client()
+def _send(method: str, system: str, user: str, model: str | None, **kwargs):
+    """Send one request with chat.completions.<method> ("create" or "parse").
+    Tries Groq, then Gemini for temporary problems. `model` overrides Groq's model."""
+    providers = [PRIMARY] + ([BACKUP] if os.getenv(BACKUP.key_env, "").strip() else [])
+    failures = []
+    for provider in providers:
+        provider_model = (model if provider is PRIMARY and model else provider.model)
+        try:
+            return _send_to(provider, provider_model, method, system, user, **kwargs)
+        except openai.OpenAIError as e:
+            failures.append(_friendly(e, provider, provider_model))
+            if not isinstance(e, FALLBACK_ERRORS):
+                break
+    raise LLMError("LLM call failed: " + " | ".join(failures))
+
+
+def _send_to(provider: Provider, model: str, method: str, system: str, user: str, **kwargs):
+    """One request to one provider. Records usage. Retries once without
+    temperature if the model rejects it."""
+    client = get_client(provider)
     params = dict(
         model=model,
         messages=[{"role": "system", "content": system}, {"role": "user", "content": user}],
@@ -100,19 +145,17 @@ def _send(method: str, system: str, user: str, model: str, **kwargs):
 
     started = time.perf_counter()
     try:
-        try:
-            response = getattr(client.chat.completions, method)(**params)
-        except openai.BadRequestError as e:
-            if "temperature" not in str(e) or "temperature" not in params:
-                raise
-            _no_temperature.add(model)  # reasoning model: remember and resend without it
-            params.pop("temperature")
-            response = getattr(client.chat.completions, method)(**params)
-    except openai.OpenAIError as e:
-        raise _friendly(e) from e
+        response = getattr(client.chat.completions, method)(**params)
+    except openai.BadRequestError as e:
+        if "temperature" not in str(e) or "temperature" not in params:
+            raise
+        _no_temperature.add(model)  # reasoning model: remember and resend without it
+        params.pop("temperature")
+        response = getattr(client.chat.completions, method)(**params)
 
     usage = response.usage
     usage_log.append(LLMUsage(
+        provider=provider.name,
         model=model,
         input_tokens=usage.prompt_tokens if usage else 0,
         output_tokens=usage.completion_tokens if usage else 0,
@@ -135,7 +178,7 @@ def parse_json_reply(reply: str) -> dict:
 
 def call_llm(system: str, user: str, model: str | None = None) -> str:
     """Plain-text call: instructions in `system`, data in `user`. Returns the reply."""
-    response = _send("create", system, user, model or MODEL)
+    response = _send("create", system, user, model)
     return response.choices[0].message.content or ""
 
 
@@ -154,7 +197,7 @@ def call_llm_structured(system: str, user: str, schema: type[BaseModel],
     last_problem = ""
     for _attempt in range(2):
         try:
-            response = _send("parse", system, user, model or MODEL, response_format=schema)
+            response = _send("parse", system, user, model, response_format=schema)
         except ValidationError as e:  # parse() validates the reply itself and raises this
             last_problem = _missing_field(e)
             continue
@@ -175,12 +218,12 @@ def call_llm_structured(system: str, user: str, schema: type[BaseModel],
 if __name__ == "__main__":
     try:
         if "--models" in sys.argv:
-            ids = sorted(m.id for m in get_client().models.list())
+            ids = sorted(m.id for m in get_client(PRIMARY).models.list())
             print("\n".join(i for i in ids if i.startswith(("gpt", "o"))))
         else:
             reply = call_llm("You are a test endpoint.", "Reply with exactly: OK")
             u = usage_log[-1]
-            print(f"model={u.model}  reply={reply!r}  tokens in/out={u.input_tokens}/{u.output_tokens}  "
+            print(f"provider={u.provider}  model={u.model}  reply={reply!r}  tokens in/out={u.input_tokens}/{u.output_tokens}  "
                   f"time={u.seconds}s")
     except LLMError as e:
         print(e)
