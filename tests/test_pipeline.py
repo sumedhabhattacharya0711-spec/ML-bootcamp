@@ -216,3 +216,15 @@ def test_naming_failure_keeps_numbered_speakers(audio, tmp_path):
             runs_dir=tmp_path / "runs", diarizer=talk_diarizer)
     assert r.stages[4].status == "failed" and "unnamed" in r.stages[4].message
     assert r.labels[0] == "Speaker 1" and r.stages[5].status == "done"
+
+
+def test_role_of_a_person_without_a_voice_still_names_the_owner():
+    from meeting_assistant.pipeline import PipelineResult
+    from meeting_assistant.speakers import NameEvidence, Speaker
+
+    r = PipelineResult(stages=[], speakers=[Speaker("S1", "Mandy", role="project manager", role_source="self")],
+                       name_evidence=[NameEvidence("", "Courtney", "assigned_role", 3, "the marketing person, Courtney",
+                                                   accepted=True, role="marketing person"),
+                                      NameEvidence("", "Bob", "assigned_role", 4, "Bob, project manager",
+                                                   accepted=True, role="project manager")])
+    assert r.roles == {"Mandy": "project manager", "Courtney": "marketing person"}  # one person per role

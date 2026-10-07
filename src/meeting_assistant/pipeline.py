@@ -77,8 +77,16 @@ class PipelineResult:
 
     @property
     def roles(self) -> dict[str, str]:
-        """{speaker label: stated role} for speakers with a role."""
-        return {s.label: s.role for s in self.speakers if s.role}
+        """{speaker label: role} for speakers with a role, plus {name: role} for
+        people given a role by name ("the marketing person, Courtney") who are
+        not matched to a voice, so "the marketing person will ..." still names them."""
+        roles = {s.label: s.role for s in self.speakers if s.role}
+        taken = set(roles.values())
+        for name, role in speakers_mod.named_roles(self.name_evidence).items():
+            if name not in roles and role not in taken:
+                roles[name] = role
+                taken.add(role)
+        return roles
 
     @property
     def labels(self) -> list[str | None]:

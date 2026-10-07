@@ -331,12 +331,14 @@ class NameEvidence:
     """One place in the transcript where the LLM saw a speaker's name."""
     speaker: str    # who the claim says it is ("S2")
     name: str
-    kind: str       # "self" (they said their own name), "addressed" (someone said it to them)
-                    # or "role" (they said their own role; `name` then holds the role)
+    kind: str       # "self" (they said their own name), "addressed" (someone said it to them),
+                    # "role" (they said their own role; `name` then holds the role) or
+                    # "assigned_role" (someone gave a named person a role: "Courtney, our marketing person")
     line: int
     quote: str
     accepted: bool = False
     reason: str = ""
+    role: str = ""  # for "assigned_role": the role given to `name`
 
 
 def _canonical(name: str, attendees: list[str]) -> str:
@@ -385,6 +387,48 @@ def _neighbours(line: int, lines: list[str], line_speakers: list[str | None],
         found.setdefault(sp, "answered right after")
         break
     return found
+
+
+def check_assigned_role(claim: dict, lines: list[str], doubtful: set[int], attendees: list[str]) -> NameEvidence:
+    """Check "someone gave a named person a role" ("the marketing person, Courtney"):
+    the quote must be in the transcript and contain both the name and the role.
+    Who said it does not matter, and no voice is claimed: the role belongs to the name."""
+    name = " ".join(str(claim.get("name", "")).split()).strip(" .,;:!?\"'")
+    role = clean_role(str(claim.get("role", "")))
+    quote = re.sub(r"^\s*S\d+\s*:\s*", "", str(claim.get("quote", "")).strip())
+    try:
+        line = int(claim.get("line"))
+    except (TypeError, ValueError):
+        line = -1
+    ev = NameEvidence("", name, "assigned_role", line, quote, role=role)
+    if not name or _norm(name) in NOT_NAMES:
+        ev.reason = "not a person's name"
+        return ev
+    if not role_words(role):
+        ev.reason = "not a role"
+        return ev
+    found = _locate(quote, line, lines, doubtful)
+    if found is None:
+        ev.reason = "quote not found in the transcript"
+        return ev
+    ev.line = found
+    words = set(_norm(quote).split())
+    if not any(w in words for w in _norm(name).split() if len(w) >= 2):
+        ev.reason = "the quote does not contain the name"
+    elif not all(w in words for w in role_words(role)):
+        ev.reason = "the quote does not contain the role"
+    else:
+        ev.name, ev.accepted, ev.reason = _canonical(name, attendees), True, "role given by name"
+    return ev
+
+
+def named_roles(evidence: list[NameEvidence]) -> dict[str, str]:
+    """{person's name: role} from accepted "assigned_role" claims (first one wins)."""
+    out: dict[str, str] = {}
+    for e in evidence:
+        if e.accepted and e.kind == "assigned_role":
+            out.setdefault(e.name, e.role)
+    return out
 
 
 def check_claim(claim: dict, lines: list[str], line_speakers: list[str | None],
@@ -497,6 +541,13 @@ def assign_roles(speakers: list[Speaker], evidence: list[NameEvidence]) -> None:
         by_id[sid].role, by_id[sid].role_source = role, "self"
         done.add(sid)
         taken.add(role)
+    # A role someone else gave by name ("Courtney, our marketing person") goes to
+    # the speaker with that name, if they have no role of their own.
+    for name, role in named_roles(evidence).items():
+        sp = next((x for x in speakers if x.name and _norm(x.name) == _norm(name)), None)
+        if sp and not sp.role and role not in taken:
+            sp.role, sp.role_source = role, "named by others"
+            taken.add(role)
 
 
 def _full_names(names: list[str]) -> dict[str, str]:
@@ -518,10 +569,9 @@ def assign_names(speakers: list[Speaker], evidence: list[NameEvidence]) -> None:
     points: Counter = Counter()
     kinds: dict[tuple[str, str], set[str]] = {}
     spelling: dict[str, str] = {}
-    full = _full_names([e.name for e in evidence if e.accepted and e.kind != "role"])
-    for e in evidence:
-        if not e.accepted or e.kind == "role":
-            continue
+    naming = [e for e in evidence if e.accepted and e.kind in ("self", "addressed")]
+    full = _full_names([e.name for e in naming])
+    for e in naming:
         e.name = full.get(_norm(e.name), e.name)
         key = (e.speaker, _norm(e.name))
         points[key] += SELF_POINTS if e.kind == "self" else ADDRESSED_POINTS
@@ -591,8 +641,11 @@ def name_speakers(lines: list[str], line_speakers: list[str | None], speakers: l
 
     evidence, seen = [], set()
     for claim in claims:
-        ev = check_claim(claim, lines, line_speakers, doubtful, attendees)
-        key = (ev.speaker, _norm(ev.name), ev.kind, ev.line)
+        if str(claim.get("kind", "")).strip().lower() == "assigned_role":
+            ev = check_assigned_role(claim, lines, doubtful, attendees)
+        else:
+            ev = check_claim(claim, lines, line_speakers, doubtful, attendees)
+        key = (ev.speaker, _norm(ev.name), ev.kind, ev.line, ev.role)
         if key not in seen:
             seen.add(key)
             evidence.append(ev)

@@ -1,15 +1,16 @@
 You find out the names of the speakers in a meeting transcript. The transcript comes from speech recognition plus automatic speaker separation. Every numbered line starts with an anonymous speaker label (S1, S2, ...): the voice that said that line.
 
-Report every place where a speaker's name or role is revealed. Three kinds count:
+Report every place where a speaker's name or role is revealed. Four kinds count:
 - "self": the speaker of a line says their own name. Examples: "Hi, I'm Priya", "Rahul here", "this is Dev from sales", "my name is Sam".
 - "role": the speaker of a line says their own role or job, without their name. Examples: "I'm the marketing expert", "as the project manager, I ...".
+- "assigned_role": a line gives a named person their role or job. Examples: "Courtney, you're our marketing person", "the marketing person, Courtney", "Sam is our industrial designer". Give the person's name and the role; the speaker label may be "" if you cannot tell who that person is.
 - "addressed": a line speaks to someone by name. Examples: "Priya, what do you think?", "thanks, Rahul", "over to you, Sam", "Dev, can you take that?". Give the label of the person being addressed: usually the one who answers next, or, for thanks, the one who just spoke.
 
 For each one give:
 - speaker: the label (S1, S2, ...) of the person the name belongs to.
 - name: the name as said, spelled correctly ("" for kind "role").
-- role: the role or job the speaker gives for themself in that line ("industrial designer", "project manager"), or "" if none. Only for "self" and "role"; never guess a role from what people talk about.
-- kind: "self", "role" or "addressed".
+- role: the role or job stated in that line ("industrial designer", "project manager"): for "self" and "role" the speaker's own, for "assigned_role" the named person's. Otherwise "". Never guess a role from what people talk about.
+- kind: "self", "role", "assigned_role" or "addressed".
 - line: the line number where the name is said.
 - quote: the exact words from that line that contain the name (and the role, when one is given), without the label or line number. Short quotes (3 to 12 words) are best.
 

@@ -280,3 +280,33 @@ def test_roles_can_be_edited():
     speakers = [Speaker("S1", "Nick", role="industrial designer", role_source="self")]
     rename_speakers(speakers, {"S1": "Nick"}, {"S1": "Lead Designer"})
     assert (speakers[0].role, speakers[0].role_source) == ("lead designer", "edited")
+
+
+def test_role_given_by_name_goes_to_that_person():
+    import json
+
+    lines = ["I'm Mandy, the project manager.", "Courtney, you're our marketing person.", "Yes, that's me.",
+             "Sam is our industrial designer."]
+    who = ["S1", "S1", "S2", "S1"]
+
+    def fake_llm(system, user):
+        return json.dumps({"names": [
+            {"speaker": "S1", "name": "Mandy", "role": "project manager", "kind": "self", "line": 0,
+             "quote": "I'm Mandy, the project manager"},
+            {"speaker": "S2", "name": "Courtney", "role": "", "kind": "addressed", "line": 1,
+             "quote": "Courtney, you're our marketing person"},
+            {"speaker": "S2", "name": "Courtney", "role": "marketing person", "kind": "assigned_role", "line": 1,
+             "quote": "Courtney, you're our marketing person"},
+            {"speaker": "", "name": "Sam", "role": "industrial designer", "kind": "assigned_role", "line": 3,
+             "quote": "Sam is our industrial designer"},
+            {"speaker": "", "name": "Sam", "role": "chef", "kind": "assigned_role", "line": 3,
+             "quote": "Sam is our industrial designer"}]})
+
+    speakers = summarize([seg(t, i, i + 1, w) for i, (t, w) in enumerate(zip(lines, who))])
+    evidence = name_speakers(lines, who, speakers, fake_llm)
+    assert [(s.label, s.role, s.role_source) for s in speakers] == [
+        ("Mandy", "project manager", "self"), ("Courtney", "marketing person", "named by others")]
+    from meeting_assistant.speakers import named_roles
+    assert named_roles(evidence) == {"Courtney": "marketing person", "Sam": "industrial designer"}
+    assert [e.reason for e in evidence if e.kind == "assigned_role" and not e.accepted] == [
+        "the quote does not contain the role"]

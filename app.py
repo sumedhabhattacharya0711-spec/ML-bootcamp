@@ -292,8 +292,8 @@ def speaker_rows(result: PipelineResult) -> list[list]:
 
 
 def name_evidence_rows(result: PipelineResult) -> list[list]:
-    return [[e.speaker, e.name, e.kind, e.line, e.quote, "accepted" if e.accepted else "rejected", e.reason]
-            for e in result.name_evidence]
+    return [[e.speaker, f"{e.name} → {e.role}" if e.role else e.name, e.kind, e.line, e.quote,
+             "accepted" if e.accepted else "rejected", e.reason] for e in result.name_evidence]
 
 
 def segment_rows(result: PipelineResult) -> list[list]:
