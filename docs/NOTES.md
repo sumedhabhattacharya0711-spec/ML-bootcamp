@@ -243,3 +243,15 @@ was checked with the full test suite plus real runs on the AMI ES2004a clip.
 - **Check:** two full ES2004a runs gave byte-identical raw/refined transcripts,
   edit log, minutes.json and minutes.md; the second run used the cache for all
   three LLM calls.
+
+### Long meetings: topic segmentation + map-reduce (segment.py, minutes.py)
+
+- Transcripts over ~4,000 estimated tokens (`MINUTES_SEGMENT_TOKENS`) are split
+  at topic changes (TextTiling-style lexical cohesion), each part gets one
+  minutes call with the earlier parts' summaries as context, the drafts are
+  merged (duplicates combined, one LLM call for the overall summary), and the
+  merged draft is verified against the whole transcript.
+- Open questions (issues left unresolved) are extracted with verified quotes.
+- Tested on a 35-minute recording (ES2004a twice): 2 parts, all stages done,
+  evidence support 100%. Known limit: differently worded near-duplicates from
+  two parts are not always merged.
