@@ -153,9 +153,22 @@ For a permanent public deployment, the same `app.py` runs on any machine or serv
 ### 1.6 Check the installation
 
 ```bash
-pytest -m "not slow"        # 149 fast tests with a fake Whisper, a fake diarizer and a fake LLM, a few seconds
-pytest                      # also runs the one slow test with real Whisper
+pytest -m "not slow"        # 169 fast tests with a fake Whisper, a fake diarizer and a fake LLM, a few seconds
+pytest                      # also runs the one slow test with real Whisper (needs the sample clip below)
 ```
+
+### 1.7 Sample meeting to try
+
+Recordings are not in the repository (`data/audio/` is git-ignored). The AMI Meeting Corpus (CC BY 4.0) has free four-person meetings with human transcripts and summaries; ES2004a is the one this project was tuned on:
+
+```bash
+curl -L -o data/audio/ES2004a.Mix-Headset.wav \
+  https://groups.inf.ed.ac.uk/ami/AMICorpusMirror/amicorpus/ES2004a/audio/ES2004a.Mix-Headset.wav
+# the 1-minute clip used by the slow test
+ffmpeg -i data/audio/ES2004a.Mix-Headset.wav -ss 80 -t 60 -ac 1 -ar 16000 data/audio/ES2004a_1min.wav
+```
+
+Upload `ES2004a.Mix-Headset.wav` in the app and set **Number of speakers** to 4. Other meetings work the same way: replace `ES2004a` with, for example, `IS1009a`, `ES2014a` or `TS3003a`.
 
 ---
 
@@ -186,11 +199,11 @@ pytest                      # also runs the one slow test with real Whisper
 | Speech-to-text model transcribes the recording | Stage 1, `stt.py` |
 | A language model corrects domain-specific terms, preserving names, numbers, negation and commitments | Stage 2, `glossary.py` + `refine.py`, with a guard that reverts edits to numbers and negations |
 | A **separate** language model produces minutes, decisions and action items | Stage 3, `minutes.py`, a different call with a different prompt and a strict schema |
-| The two LLM roles are distinct stages, run in order in one workflow | `pipeline.py` runs Stage 1 → 1b → 2 → 3 |
+| The two LLM roles are distinct stages, run in order in one workflow | `pipeline.py` runs Stage 1 → 1a → 1b → 2 → 2b → 3 |
 | Raw and refined transcripts retained and shown separately | Transcripts tab; `transcript_raw.txt` and `transcript_refined.txt` in every run |
 | Owners and deadlines only when stated, otherwise "unspecified" | Stage 3: Python sets them from verified quotes only; "I'll do it" names its speaker as owner |
 | Speaker labels (optional in the brief) | Stage 1a diarization, Stage 2b names from the transcript, editable in the Speakers tab |
-| A proposal is never presented as an agreed decision | Stage 3: status is set by Python, "agreed" only with a verified agreement quote |
+| A proposal is never presented as an agreed decision | Stage 3: status is set by Python, "agreed" only with a verified agreement quote from someone other than the proposer; points stated as settled without objection are labelled "decided, no objection", never "agreed" |
 | Unsupported, empty or unreadable files get a clear error | `stt.check_audio()`, shown in the status table |
 | Clear processing or failure status | per-stage status table: waiting, running, done, failed, skipped, with time and message |
 | Human-readable and machine-readable record with the same content | `minutes.md` and `minutes.json`, both rendered from one pydantic object |
@@ -398,19 +411,22 @@ Same rule as the rest of the project: **the LLM proposes, Python verifies.** LLM
 
 Third-person mentions ("Priya said yesterday", "send it to Rahul") are not evidence, and words like "everyone" or "team" are not names. Lines flagged as possible hallucinations are ignored. A self-introduction counts 3 points, being addressed 1 point. Names are then handed out one to one, best first. A speaker whose two best names tie, or a name that fits two speakers equally well, stays unnamed with a note ("unclear: Priya or Rahul"). Confidence is "high" from 2 points (an introduction, or being addressed twice). A heard name is spelled like the closest attendee you typed ("pria" → "Priya Sharma").
 
+**Roles** are found the same way. A speaker's own words give their role ("I'm Nick, the industrial designer", "as the project manager, I …"); the role must be in a quote from that speaker's own line. A role someone else gives by name ("Courtney, you're our marketing person", "the marketing person, Courtney") goes to that person: to the speaker with that name if they have no role of their own, otherwise it stays with the name. One role per speaker; two equally likely roles leave the speaker without one. Roles are never guessed from what people talk about.
+
 Every claim and its verdict is shown in the Details tab and saved in `speakers.json`.
 
 ### 7.3 Editing names
 
-Automatic names can be wrong, and a speaker nobody names stays "Speaker N". In the **Speakers** tab you can type any name and press **Apply names**. This renames the speaker in the transcripts, the meeting record (summary, minutes, owners, evidence) and the saved files, without running Whisper or any LLM again. Quotes stay word for word as spoken. Giving two speakers the same name merges them (useful when diarization split one person in two); clearing a name goes back to "Speaker N". `pipeline.rename_speakers(result, {"S2": "Rahul"})` does the same from Python.
+Automatic names can be wrong, and a speaker nobody names stays "Speaker N". In the **Speakers** tab you can type any name (and role) and press **Apply names**. This renames the speaker in the transcripts, the meeting record (summary, minutes, owners, evidence) and the saved files, without running Whisper or any LLM again. Quotes stay word for word as spoken. Giving two speakers the same name merges them (useful when diarization split one person in two); clearing a name goes back to "Speaker N". `pipeline.rename_speakers(result, {"S2": "Rahul"})` does the same from Python.
 
 ### 7.4 What the record gains
 
-With speakers known, Stage 3 sees `[i] Priya: …` and Python adds three rules:
+With speakers known, Stage 3 sees `[i] Priya: …` (and a list of the participants' roles) and Python adds four rules:
 
 - **Agreement must come from someone else:** the proposer's own "yes, let's do that" does not make a decision agreed (Fernández et al. 2008: a proposal plus agreement by others).
 - **"I'll do it" names its speaker as owner:** if no owner is supported by a quote, the speaker of a verified first-person commitment ("I'll send it", "let me check") becomes the owner.
 - **The owner must accept it:** when the owner is a known speaker, an action item is "agreed" only if the acceptance quote is the owner's own.
+- **A task given to a role names its owner:** "the industrial designer will prepare the working design" makes the speaker (or named person) with that role the owner, but only if the quote really names the role ("the marketing expert" also matches a "marketing manager"; "the project" alone matches nothing). Without an acceptance quote the item stays "proposed".
 
 Every evidence quote carries its speaker (`[00:12.40] Rahul, agreement: "…"`), and the record lists the participants.
 
@@ -481,9 +497,10 @@ Every edit, applied or blocked, goes into the **edit log** with its reason. "Pos
 Following Fernández et al. 2008, *Modelling and Detecting Decisions in Multi-party Dialogue* (SIGdial, [aclanthology.org/W08-0125](https://aclanthology.org/W08-0125/)), a decision is a proposal followed by explicit agreement. LLM #2 reads the refined transcript and returns a `MinutesDraft`:
 
 ```text
+given            fact, quote                     (brief, budget, targets handed to the meeting)
 summary          3 to 6 sentences
 minutes          main topics, one line each
-decisions        text, proposal_quote, agreement_quotes[], rejection_quotes[]
+decisions        text, proposal_quote, agreement_quotes[], rejection_quotes[], settled_quote
 action_items     task, task_quote, owner, owner_quote, deadline, deadline_quote, agreement_quote
 open_questions   question, quote
 ```
@@ -494,14 +511,16 @@ It is called with the pydantic schema as the response format, so the provider co
 
 - **Quote check:** every quote is looked up in the transcript (`rapidfuzz.partial_ratio` ≥ 90) and mapped to its line and timestamp. An item whose main quote is not found is **dropped**. Doubtful lines never count as evidence.
 - **Decision status:**
-  - `agreed`: a verified agreement quote exists. A lone backchannel ("mm hmm", "yeah", "okay" …) does not count.
-  - `rejected`: a verified rejection quote exists.
+  - `agreed`: a verified agreement quote exists. A lone backchannel ("mm hmm", "yeah", "okay" …) does not count, nor does the proposer agreeing with themself.
+  - `uncontested`, shown as **"decided, no objection"**: nobody explicitly agreed, but the point was stated as settled ("so the selling price is 25 euro", "we're going with rubber") and no verified objection came after it. Hedged wording ("maybe", "I think", "what about", a question) never counts. This is kept apart from `agreed` on purpose: it records that nobody objected, not that people agreed.
+  - `rejected`: a verified rejection quote exists (and is the latest word).
   - `open`: anything else. Open proposals are listed, never shown as decisions.
+- **Given facts:** facts the meeting was handed rather than decided (the project brief, prices, profit targets, cost limits) are listed in their own **Given** section, each with a checked quote, so they do not inflate the decisions.
 - **Owners and deadlines:** kept only if a verified quote supports them, otherwise `"unspecified"`.
 - **Action-item status:** `agreed` (named owner plus a verified acceptance), `proposed` (owner named but nobody verifiably took it on), `unassigned` (no supported owner).
 - **Evidence:** each item keeps all its verified quotes with role (proposal, agreement, rejection, task, owner, deadline), line number and start time.
 
-Everything that was removed or downgraded is listed with the reason, and counted in a **faithfulness report** (decisions proposed / kept / agreed, action items proposed / kept / agreed, owners and deadlines removed, quotes ignored, evidence support rate, refinement edits applied and blocked).
+Everything that was removed or downgraded is listed with the reason, and counted in a **faithfulness report** (decisions proposed / kept / agreed / uncontested, action items proposed / kept / agreed, given facts proposed / kept, owners and deadlines removed, owners found from a speaker or a role, quotes ignored, evidence support rate, refinement edits applied and blocked, speakers found / named / with a role).
 
 ### 9.3 Long meetings
 
@@ -519,7 +538,7 @@ The verified `Minutes` object is rendered twice: `minutes.md` for people and `mi
 
 | Feature | Detail |
 |---|---|
-| Providers | Groq (`openai/gpt-oss-120b`) as primary, Gemini Flash as backup, both through their OpenAI-compatible APIs with the `openai` client |
+| Providers | Groq (`openai/gpt-oss-120b`) as primary, Gemini (`gemini-2.5-flash`) as backup, both through their OpenAI-compatible APIs with the `openai` client |
 | Two entry points | `call_llm(system, user)` returns text (glossary, refine); `call_llm_structured(system, user, Model)` returns a validated pydantic object (minutes) |
 | Fallback | on a rate limit, quota, timeout, outage or server error, the same request goes to Gemini (when `LLM_GEMINI_KEY` is set). A bad key, bad request or wrong model name does **not** fall back, so setup mistakes stay visible |
 | Retries | up to 3, waiting as long as the provider asks |
@@ -567,11 +586,12 @@ Each stage has a status (waiting, running, done, failed, skipped), a message and
 
 **File:** `app.py` (Gradio)
 
-- A minimal light theme, one page: inputs at the top, Run, the status table, then four tabs.
-- One Whisper model in memory at a time, behind a lock; runs are queued one at a time (one GPU).
+- A minimal light theme, one page: inputs at the top, Run, the status table, then five tabs (Meeting record, Speakers, Transcripts, Details, Files).
+- One Whisper model in memory at a time, behind a lock; runs are queued one at a time (one GPU). The speaker model is loaded on the first run that asks for speakers and kept; if it cannot load (no `HF_TOKEN`, no access), every run says why in Stage 1a and continues without speakers.
+- The Speakers tab shows one colour per voice in a conversation view, and a table where names and roles can be edited; **Apply names** renames everywhere and rewrites the saved files without running any model again.
 - The pipeline runs in a worker thread and streams status updates into the table.
 - When a run starts, old results are cleared, so nothing stale stays on screen.
-- A header above the results records what this result came from: file, Whisper size and device, LLM, audio length, segments, hotwords, typed glossary, packs, and the run folder.
+- A header above the results records what this result came from: file, Whisper size and device, LLM, audio length, segments, hotwords, speakers, typed glossary, packs, and the run folder.
 
 ---
 
@@ -584,7 +604,8 @@ For each recording the app displays and lets you download:
 | Raw transcript | the speech-to-text result before refinement |
 | Refined transcript | after domain-term correction, with every edit logged |
 | Meeting minutes | a concise summary and the main topics in order |
-| Key decisions | each with status (agreed / open / rejected) and timestamped evidence; an empty list if none were reached |
+| Given | brief, budget and targets the meeting was handed, each with its quote |
+| Key decisions | each with status (agreed / decided, no objection / open / rejected) and timestamped evidence with the speaker; an empty list if none were reached |
 | Action items | task, owner and deadline (or "unspecified"), status and evidence; an empty list if none |
 | Open questions | issues the meeting explicitly left open |
 
@@ -612,7 +633,7 @@ All settings live in `.env` (copy `.env.example`):
 | `LLM_BASE_URL` | Groq's OpenAI-compatible URL | any OpenAI-compatible endpoint |
 | `LLM_MODEL` | `openai/gpt-oss-120b` | model for both LLM stages |
 | `LLM_GEMINI_KEY` | (empty) | enables the Gemini backup |
-| `LLM_GEMINI_MODEL` | Gemini Flash | backup model |
+| `LLM_GEMINI_MODEL` | `gemini-2.5-flash` | backup model (any model your key lists) |
 | `LLM_CACHE` | on | `0` disables the answer cache |
 | `MINUTES_SEGMENT_TOKENS` | `4000` | transcript size above which Stage 3 splits by topic |
 | `HF_TOKEN` | (empty) | Hugging Face token for speaker diarization; empty = no speakers |
@@ -667,7 +688,7 @@ ML-bootcamp/
 ## 16. Tests
 
 ```bash
-pytest -m "not slow"   # 149 tests, a few seconds, no GPU or API key needed
+pytest -m "not slow"   # 169 tests, a few seconds, no GPU or API key needed
 pytest                 # plus 1 slow test with real Whisper
 ```
 
@@ -679,8 +700,8 @@ The tests cover the deterministic parts with a fake Whisper and a fake LLM; LLM 
 | `test_hallucination.py` | "Thanks for watching!" is flagged; a single confident "Thank you." at the end is not; repeats and loops; normal lines pass |
 | `test_glossary.py` | parsing typed terms, packs and comments, grounding of inferred terms, merge priority, graceful failure, the hotwords cap |
 | `test_refine.py` | cube flow → Kubeflow is hinted; everyday words are not; weak hints below 82 are not sent; the guard blocks numbers, negations, unhinted words and non-glossary results |
-| `test_minutes.py` | the proposer's own agreement does not count; "I'll do it" makes its speaker the owner; proposal + agreement = agreed; proposal alone or "mm hmm" = open; unverified quotes dropped; missing owners become unspecified; Markdown and JSON carry the same items |
-| `test_speakers.py` | lines split where the speaker changes, jitter smoothing, every name check (self, addressed + answered, third person, invented quotes), one-to-one naming and ties, renaming |
+| `test_minutes.py` | the proposer's own agreement does not count; "I'll do it" makes its speaker the owner; a task given to a role names its owner; settled and unchallenged is "decided, no objection", hedged is not; given facts are checked and listed apart; proposal + agreement = agreed; proposal alone or "mm hmm" = open; unverified quotes dropped; missing owners become unspecified; Markdown and JSON carry the same items |
+| `test_speakers.py` | lines split where the speaker changes, jitter smoothing, every name and role check (self, addressed + answered, role given by name, third person, invented quotes), one-to-one naming and ties, first name = full name, renaming |
 | `test_segment.py` | long transcripts split at topic changes, within the size budget |
 | `test_llm.py` | fallback to Gemini on rate limits, no fallback on a bad key, cut-off answers retried with a larger limit, rejected settings dropped |
 | `test_pipeline.py` | speakers found, named and used in the record; renaming rewrites the files; diarization or naming failures carry on; a full run saves every file; bad audio skips later stages; a Stage 2 failure still writes minutes; a Stage 3 failure keeps both transcripts |
@@ -746,7 +767,8 @@ python -m meeting_assistant.llm --models   # lists the models your key can use
 | `libcublas.so.12 is not found` | same as above: the CUDA pip packages are missing from the environment |
 | Out of GPU memory | choose `small` or `medium` instead of `large-v3` |
 | "LLM provider: key rejected" | check `LLM_API_KEY` in `.env` (one variable per line, no quotes needed) |
-| "rate limited" in Stage 2 or 3 | wait a minute and run again, or add `LLM_GEMINI_KEY` for the backup |
+| "rate limited" in Stage 2 or 3 | Groq's free tier allows ~8K tokens per minute **and 200K per day** for `gpt-oss-120b` (about 15 to 20 meetings); add `LLM_GEMINI_KEY` so the Gemini backup takes over, or wait |
+| "CUDA out of memory" in Stage 1a | another program (for example a second copy of the app) holds the GPU; close it. The run continues without speakers |
 | First run is slow | it is downloading Whisper (~1.5 GB); later starts load from the local cache |
 | Stage 1a: "HF_TOKEN is not set" or "Could not load …" | set `HF_TOKEN` in `.env` and accept the model's conditions on its Hugging Face page with the same account |
 | Speakers merged or split wrongly | enter the right **number of speakers** and run again, or give two speakers the same name to merge them |
