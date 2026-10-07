@@ -341,6 +341,8 @@ FAITHFULNESS_LABELS = {
     "speakers_with_role": "Speakers with a role they stated (or you typed)",
     "owners_from_role": "Owners set from the role a task was given to (\"the designer will ...\")",
     "decisions_uncontested": "Decisions stated as settled with no objection (not explicitly agreed)",
+    "given_proposed": "Given facts (brief, budget, targets) proposed by the LLM",
+    "given_kept": "Given facts kept (quote verified)",
     "name_claims_proposed": "Name claims proposed by the LLM",
     "name_claims_accepted": "Name claims accepted by the checks",
 }

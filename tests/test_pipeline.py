@@ -39,7 +39,7 @@ def fake_llm(system, user):
 
 
 def fake_structured(system, user, schema):
-    return MinutesDraft(summary="Short meeting.", minutes=["Training jobs"], action_items=[], open_questions=[],
+    return MinutesDraft(given=[], summary="Short meeting.", minutes=["Training jobs"], action_items=[], open_questions=[],
                         decisions=[DecisionEvidence(text="Keep it", proposal_quote="I propose we keep it",
                                                     agreement_quotes=["Yes, let's keep it"],
                                                     rejection_quotes=[], settled_quote="")])
@@ -153,7 +153,7 @@ def talk_llm(system, user):
 def talk_structured(system, user, schema):
     assert "[2] Speaker 2: Yes, let's keep it." not in user  # names are known by Stage 3
     assert "[2] Rahul: Yes, let's keep it." in user
-    return MinutesDraft(
+    return MinutesDraft(given=[],
         summary="Rahul will send the report.", minutes=["Keeping it"], open_questions=[],
         decisions=[DecisionEvidence(text="Keep it", proposal_quote="I propose we keep it",
                                     agreement_quotes=["Yes, let's keep it"], rejection_quotes=[],

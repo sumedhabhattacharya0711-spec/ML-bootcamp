@@ -8,13 +8,18 @@ summary: 3 to 6 sentences on what the meeting was about and what came out of it.
 
 minutes: the main topics discussed, in order, one short line each.
 
+given: facts the meeting was handed rather than decided: the project brief, budgets, prices, profit targets, cost limits, deadlines or requirements set by management or the client, usually presented by the chair. For each one:
+- fact: the fact in one short sentence.
+- quote: the exact words from the transcript where it was stated.
+Do not list these again under decisions.
+
 decisions: every proposal that was put forward for the group to decide. For each one:
 - text: the proposal in one short sentence.
 - proposal_quote: the exact words from the transcript where it was proposed.
 - agreement_quotes: exact words from the transcript where people other than the proposer accepted it. Leave empty if nobody clearly accepted it.
 - rejection_quotes: exact words from the transcript where people rejected it. Leave empty if nobody rejected it.
 - settled_quote: the exact words where it was stated as settled or decided rather than suggested, for example "so the selling price will be 25 euro", "we're going with rubber", "it has to be shockproof". Use "" if it was only ever suggested ("maybe", "should we", "what about").
-Include proposals that were not agreed, and settled points nobody discussed further (given budgets, prices, targets, choices the chair announced). Do not decide whether it was agreed; just give the quotes.
+Include proposals that were not agreed, and choices the group settled without discussing them further. Facts handed to the meeting (brief, budget, targets) belong under given, not here. Procedural remarks about running the meeting itself ("let's skip the whiteboard", "should we take notes") are not decisions. Do not decide whether it was agreed; just give the quotes.
 
 action_items: every task someone committed to or was given, including work handed out to roles for the next meeting. For each one:
 - task: the task in one short sentence.

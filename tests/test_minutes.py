@@ -34,7 +34,7 @@ def action(task, quote, owner="unspecified", owner_quote="", deadline="unspecifi
 
 
 def draft(decisions=(), actions=(), questions=()):
-    return MinutesDraft(summary="Design meeting.", minutes=["Remote control design"],
+    return MinutesDraft(given=[], summary="Design meeting.", minutes=["Remote control design"],
                         decisions=list(decisions), action_items=list(actions),
                         open_questions=list(questions))
 
@@ -189,10 +189,10 @@ def test_long_transcript_is_written_in_parts_and_merged():
     def fake_structured(system, user, schema):
         sent.append(user)
         if "part 1 of" in user:
-            return MinutesDraft(summary="Case material discussed.", minutes=["Case material"],
+            return MinutesDraft(given=[], summary="Case material discussed.", minutes=["Case material"],
                                 decisions=[decision("Rubber case", "I propose we make the case out of rubber")],
                                 action_items=[], open_questions=[])
-        return MinutesDraft(summary="Costs and suppliers discussed.", minutes=["Case material", "Costs"],
+        return MinutesDraft(given=[], summary="Costs and suppliers discussed.", minutes=["Case material", "Costs"],
                             decisions=[decision("Rubber case", "I propose we make the case out of rubber",
                                                 agree=["rubber is a good idea, let's go with that"])],
                             action_items=[action("Send cost spreadsheet",
@@ -212,8 +212,8 @@ def test_long_transcript_is_written_in_parts_and_merged():
 
 def test_part_summary_merge_falls_back_when_llm_fails():
     from meeting_assistant.minutes import merge_drafts
-    a = MinutesDraft(summary="First half.", minutes=[], decisions=[], action_items=[], open_questions=[])
-    b = MinutesDraft(summary="Second half.", minutes=[], decisions=[], action_items=[], open_questions=[])
+    a = MinutesDraft(given=[], summary="First half.", minutes=[], decisions=[], action_items=[], open_questions=[])
+    b = MinutesDraft(given=[], summary="Second half.", minutes=[], decisions=[], action_items=[], open_questions=[])
 
     def broken(system, user):
         raise RuntimeError("rate limited")
@@ -390,3 +390,18 @@ def test_plain_statements_are_settled_hedges_and_questions_are_not():
     assert not is_settled_wording("hopefully should be less than 12.50 euro")
     assert not is_settled_wording("I think it should be shockproof")
     assert not is_settled_wording("Is it 25 euro?")
+
+
+def test_given_facts_are_checked_and_listed_apart_from_decisions():
+    from meeting_assistant.minutes import GivenEvidence
+    d = MinutesDraft(given=[GivenEvidence(fact="Selling price is 25 euro", quote="The selling price will be 25 euro"),
+                            GivenEvidence(fact="Budget is 1 million", quote="our budget is one million")],
+                     summary="Kickoff.", minutes=[], decisions=[], action_items=[], open_questions=[])
+    result = verify(d, CHAIR_INDEX)
+    assert [g.fact for g in result.minutes.given] == ["Selling price is 25 euro"]
+    assert result.checks["given_proposed"] == 2 and result.checks["given_kept"] == 1
+    assert any('Given fact dropped' in n for n in result.dropped)
+    md = to_markdown(result.minutes)
+    given_part = md.split("## Given")[1].split("## Decisions")[0]
+    assert "Selling price is 25 euro" in given_part and "Budget" not in given_part
+    assert "- (none)" in md.split("## Decisions")[1].split("## Action items")[0]

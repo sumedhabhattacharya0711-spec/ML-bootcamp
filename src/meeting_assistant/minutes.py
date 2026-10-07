@@ -15,6 +15,9 @@ someone other than the proposer said it, and "I'll do it" makes its speaker
 the owner of the task. When speakers stated their roles, a task given to a
 role ("the industrial designer will ...") is owned by the speaker with that role.
 
+Facts the meeting was handed (the brief, budget, prices, targets set by
+management) are listed under "given", not as decisions of the meeting.
+
 A proposal that nobody explicitly agreed to can still be "uncontested": it
 was stated as settled ("so the selling price will be 25 euro", not "maybe we
 should ...") and no verified objection came after it. It is shown as
@@ -87,7 +90,13 @@ class OpenQuestionEvidence(BaseModel):
     quote: str
 
 
+class GivenEvidence(BaseModel):
+    fact: str
+    quote: str
+
+
 class MinutesDraft(BaseModel):
+    given: list[GivenEvidence]  # facts handed to the meeting (brief, budget), not decided by it
     summary: str
     minutes: list[str]
     decisions: list[DecisionEvidence]
@@ -127,12 +136,19 @@ class OpenQuestion(BaseModel):
     evidence: list[Evidence] = []
 
 
+class GivenFact(BaseModel):
+    fact: str
+    quote: str
+    evidence: list[Evidence] = []
+
+
 class Minutes(BaseModel):
     summary: str
     minutes: list[str]
     decisions: list[Decision]
     action_items: list[ActionItem]
     open_questions: list[OpenQuestion] = []
+    given: list[GivenFact] = []   # facts handed to the meeting (brief, budget, targets)
     participants: list[str] = []  # speaker names, when speakers are known
     roles: dict[str, str] = {}    # speaker name -> role they stated ("industrial designer")
 
@@ -281,7 +297,8 @@ def verify(draft: MinutesDraft, index: QuoteIndex) -> MinutesResult:
                   actions_proposed=len(draft.action_items), actions_kept=0, actions_agreed=0,
                   open_questions_proposed=len(draft.open_questions), open_questions_kept=0,
                   owners_removed=0, deadlines_removed=0, quotes_ignored=0, owners_from_speaker=0,
-                  owners_from_role=0, decisions_uncontested=0)
+                  owners_from_role=0, decisions_uncontested=0,
+                  given_proposed=len(draft.given), given_kept=0)
 
     decisions = []
     for d in draft.decisions:
@@ -348,14 +365,23 @@ def verify(draft: MinutesDraft, index: QuoteIndex) -> MinutesResult:
         questions.append(OpenQuestion(question=q.question, quote=q.quote,
                                       evidence=[index.evidence("open question", q.quote, pos)]))
 
+    given = []
+    for g in draft.given:
+        pos = index.find(g.quote)
+        if pos is None:
+            dropped.append(f'Given fact dropped, quote not in transcript: "{g.fact}"')
+            continue
+        given.append(GivenFact(fact=g.fact, quote=g.quote, evidence=[index.evidence("given", g.quote, pos)]))
+    checks["given_kept"] = len(given)
+
     checks["decisions_kept"] = len(decisions)
     checks["open_questions_kept"] = len(questions)
     checks["decisions_agreed"] = sum(d.status == "agreed" for d in decisions)
     checks["decisions_uncontested"] = sum(d.status == "uncontested" for d in decisions)
     checks["actions_kept"] = len(actions)
     checks["actions_agreed"] = sum(a.status == "agreed" for a in actions)
-    minutes = Minutes(summary=draft.summary, minutes=draft.minutes,
-                      decisions=decisions, action_items=actions, open_questions=questions)
+    minutes = Minutes(summary=draft.summary, minutes=draft.minutes, decisions=decisions,
+                      action_items=actions, open_questions=questions, given=given)
     return MinutesResult(minutes, dropped, checks)
 
 
@@ -468,8 +494,8 @@ def _unique(evidence: list[Evidence]) -> list[Evidence]:
 
 
 def support_rate(checks: dict) -> float | None:
-    """Share of the LLM's decisions, action items and open questions whose evidence verified."""
-    kinds = ("decisions", "actions", "open_questions")
+    """Share of the LLM's decisions, action items, open questions and given facts whose evidence verified."""
+    kinds = ("decisions", "actions", "open_questions", "given")
     proposed = sum(checks.get(f"{k}_proposed", 0) for k in kinds)
     kept = sum(checks.get(f"{k}_kept", 0) for k in kinds)
     return round(kept / proposed, 3) if proposed else None
@@ -571,8 +597,9 @@ def merge_drafts(drafts: list[MinutesDraft], call_text=None) -> MinutesDraft:
         except Exception:  # LLM failure: keep the parts' summaries joined, the record still works
             pass
 
-    minutes, decisions, actions, questions = [], [], [], []
+    minutes, decisions, actions, questions, given = [], [], [], [], []
     for d in drafts:
+        given += [g for g in d.given if not any(_same(g.fact, x.fact) for x in given)]
         minutes += [m for m in d.minutes if not any(_same(m, x) for x in minutes)]
         for dec in d.decisions:
             match = next((x for x in decisions if _same(x.text, dec.text)
@@ -594,7 +621,7 @@ def merge_drafts(drafts: list[MinutesDraft], call_text=None) -> MinutesDraft:
                     setattr(match, quote_name, getattr(act, quote_name))
             match.agreement_quote = match.agreement_quote or act.agreement_quote
         questions += [q for q in d.open_questions if not any(_same(q.question, x.question) for x in questions)]
-    return MinutesDraft(summary=summary, minutes=minutes, decisions=decisions,
+    return MinutesDraft(given=given, summary=summary, minutes=minutes, decisions=decisions,
                         action_items=actions, open_questions=questions)
 
 
@@ -616,6 +643,11 @@ def to_markdown(m: Minutes) -> str:
                                                  for p in m.participants), ""]
     lines += ["## Summary", "", m.summary, "", "## Minutes", ""]
     lines += [f"- {item}" for item in m.minutes] or ["- (none)"]
+    lines += ["", "## Given (brief, budget, targets: not decided in this meeting)", ""]
+    for g in m.given:
+        lines += [f"- {g.fact}"] + _evidence_lines(g.evidence)
+    if not m.given:
+        lines.append("- (none)")
     lines += ["", "## Decisions", ""]
     for d in m.decisions:
         status = "decided, no objection" if d.status == "uncontested" else d.status
@@ -659,7 +691,9 @@ def rename_in_minutes(m: Minutes, changes: dict[str, str], line_speakers: list[s
         a.task, a.owner = replace_labels(a.task, changes), replace_labels(a.owner, changes)
     for q in m.open_questions:
         q.question = replace_labels(q.question, changes)
-    for item in [*m.decisions, *m.action_items, *m.open_questions]:
+    for g in m.given:
+        g.fact = replace_labels(g.fact, changes)
+    for item in [*m.decisions, *m.action_items, *m.open_questions, *m.given]:
         for e in item.evidence:
             if e.speaker and e.line < len(line_speakers):
                 e.speaker = line_speakers[e.line]
