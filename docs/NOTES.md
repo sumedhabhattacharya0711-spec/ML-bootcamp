@@ -204,3 +204,25 @@ was checked with the full test suite plus real runs on the AMI ES2004a clip.
   possible hallucinations marked) beside the refined one (applied edits
   marked), tables for segments / edit log / hints / possible errors / glossary
   / LLM calls, and the saved files + run.json.
+
+## Research additions (from the team's Part 04/05/07 notes)
+
+- **Timestamped, multi-span evidence (Part 04, MeetingQA):** every decision
+  and action item carries all of its verified quotes (`evidence`: role,
+  quote, line, start seconds): proposal + agreement/rejection for decisions;
+  task, owner, deadline and acceptance quotes for action items. Shown in the
+  Markdown as `[mm:ss.ss] role: "quote"` and saved in minutes.json.
+- **Action-item agreement (Part 04, Purver et al.'s D/O/T/A):** the LLM also
+  returns `agreement_quote`; Python sets `status`: `agreed` (named owner and a
+  verified, non-backchannel acceptance quote), `proposed` (owner but no
+  verified acceptance), `unassigned` (no supported owner).
+- **Faithfulness report (Part 07's key metrics, computed per run without gold
+  data):** decisions/action items proposed vs kept, agreed counts, owners and
+  deadlines removed, ignored agreement quotes, evidence support rate, and the
+  refine guard's applied/blocked edits by reason. In `run.json`
+  ("faithfulness") and as a table in the UI.
+- **Considered, not done:** Fast Conformer hybrid (needs training), AlignScore
+  (1.4 GB model; exact quote matching is stricter for extractive evidence),
+  SelfCheckGPT (5x LLM calls vs free-tier limits), Self-Refine / ReAct / DSPy /
+  RL (extra LLM rounds or training), pyannote speaker labels (needs HF token;
+  optional in the brief).

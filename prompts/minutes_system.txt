@@ -20,6 +20,7 @@ action_items: every task someone committed to or was given. For each one:
 - owner_quote: the exact words that show the owner, or "" if unspecified.
 - deadline: the deadline exactly as said ("next Tuesday", "by the 15th"); otherwise "unspecified".
 - deadline_quote: the exact words that show the deadline, or "" if unspecified.
+- agreement_quote: the exact words where the owner accepted the task or volunteered for it ("Yes, I'll do that", "I'll send it"), or "" if nobody clearly took it on.
 
 Rules:
 - Every quote must be copied word for word from the transcript, without the line number. Short quotes (5 to 20 words) are best.

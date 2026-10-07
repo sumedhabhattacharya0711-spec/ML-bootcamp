@@ -216,6 +216,32 @@ def details(result: PipelineResult, saved: dict) -> tuple:
     return segment_rows(result), edits, hints, possible, glossary, usage
 
 
+FAITHFULNESS_LABELS = {
+    "evidence_support_rate": "Evidence support rate (items kept with verified quotes / items the LLM proposed)",
+    "decisions_proposed": "Decisions proposed by the LLM",
+    "decisions_kept": "Decisions kept (proposal quote verified)",
+    "decisions_agreed": "Decisions marked agreed (verified agreement quote)",
+    "actions_proposed": "Action items proposed by the LLM",
+    "actions_kept": "Action items kept (task quote verified)",
+    "actions_agreed": "Action items agreed (owner + verified acceptance quote)",
+    "owners_removed": "Owners not supported by a quote, set to unspecified",
+    "deadlines_removed": "Deadlines not supported by a quote, set to unspecified",
+    "quotes_ignored": "Agreement/rejection quotes ignored (backchannel or not found)",
+    "edits_applied": "Refinement edits applied",
+}
+
+
+def faithfulness_rows(saved: dict) -> list[list]:
+    """The run's faithfulness counts from run.json, with readable labels."""
+    rows = []
+    for key, value in saved.get("faithfulness", {}).items():
+        label = FAITHFULNESS_LABELS.get(key, key.replace("edits_blocked: ", "Refinement edits blocked: "))
+        if key == "evidence_support_rate" and value is not None:
+            value = f"{value:.1%}"
+        rows.append([label, value])
+    return rows
+
+
 def minutes_view(result: PipelineResult) -> tuple[str, str]:
     if not result.minutes:
         return "_No meeting record: see the Stage 3 status above._", ""
@@ -231,7 +257,7 @@ def run_meeting(audio_file, glossary_text, packs, size):
     the status table as each stage starts and ends, then all results."""
     # Old results are cleared when a run starts, so nothing stale stays on screen;
     # progress updates then leave the other outputs untouched.
-    cleared = ["", "", "", [], [], [], [], [], [], [], [], None, None]
+    cleared = ["", "", "", [], [], [], [], [], [], [], [], [], None, None]
     unchanged = [gr.update()] * len(cleared)
     if not audio_file:
         yield [gr.update(interactive=True), [[STAGES[0], "failed", 0.0, "Choose an audio file first."]]] + cleared
@@ -273,11 +299,11 @@ def run_meeting(audio_file, glossary_text, packs, size):
     files = [str(result.run_dir / n) for n in SAVED_FILES if result.run_dir and (result.run_dir / n).exists()]
     header = run_header(result, audio_path.name, glossary_text or "", packs or [], size)
     if not result.transcript:
-        yield [gr.update(interactive=True), status_rows(result), header, "", "", [], []] + \
+        yield [gr.update(interactive=True), status_rows(result), header, "", "", [], [], []] + \
               [[]] * 6 + [files, saved]
         return
     record, dropped = minutes_view(result)
-    yield [gr.update(interactive=True), status_rows(result), header, record, dropped,
+    yield [gr.update(interactive=True), status_rows(result), header, record, dropped, faithfulness_rows(saved),
            raw_highlights(result), refined_highlights(result), *details(result, saved), files, saved]
 
 
@@ -309,6 +335,8 @@ def build_ui(default_size: str) -> gr.Blocks:
             record = gr.Markdown()
             gr.Markdown("**Removed or downgraded by the quote checks**")
             dropped = gr.Markdown()
+            faith = gr.Dataframe(headers=["Faithfulness check", "Value"], interactive=False, wrap=True,
+                                 label="Faithfulness report (counts from this run's verification)")
         with gr.Tab("Transcripts"):
             with gr.Row():
                 raw = gr.HighlightedText(label="Raw (Whisper) — low-confidence words and possible "
@@ -336,7 +364,7 @@ def build_ui(default_size: str) -> gr.Blocks:
             files = gr.File(label="Saved files for this run", file_count="multiple", interactive=False)
             run_json = gr.JSON(label="run.json")
 
-        OUTPUTS = [run_btn, status, header, record, dropped, raw, refined,
+        OUTPUTS = [run_btn, status, header, record, dropped, faith, raw, refined,
                    segments, edits, hints, possible, glossary_table, usage, files, run_json]
         run_btn.click(run_meeting, [audio, glossary, packs, size], OUTPUTS)
     return demo

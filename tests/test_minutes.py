@@ -1,8 +1,8 @@
 import json
 
 from meeting_assistant.minutes import (
-    ActionItemEvidence, DecisionEvidence, MinutesDraft, to_json, to_markdown,
-    format_transcript, verify, write_minutes,
+    ActionItemEvidence, DecisionEvidence, MinutesDraft, QuoteIndex, to_json, to_markdown,
+    format_transcript, support_rate, verify, write_minutes,
 )
 
 SEGMENTS = [
@@ -17,7 +17,8 @@ SEGMENTS = [
     "Someone should also check the battery supplier.",
     "Thanks for watching!",
 ]
-EVIDENCE = " ".join(SEGMENTS[:-1])  # segment 9 is doubtful
+STARTS = [10.0 * i for i in range(len(SEGMENTS))]
+EVIDENCE = QuoteIndex(list(enumerate(SEGMENTS[:-1])), STARTS)  # segment 9 is doubtful
 
 
 def decision(text, proposal, agree=(), reject=()):
@@ -25,9 +26,11 @@ def decision(text, proposal, agree=(), reject=()):
                             agreement_quotes=list(agree), rejection_quotes=list(reject))
 
 
-def action(task, quote, owner="unspecified", owner_quote="", deadline="unspecified", deadline_quote=""):
+def action(task, quote, owner="unspecified", owner_quote="", deadline="unspecified", deadline_quote="",
+           agreement_quote=""):
     return ActionItemEvidence(task=task, task_quote=quote, owner=owner, owner_quote=owner_quote,
-                              deadline=deadline, deadline_quote=deadline_quote)
+                              deadline=deadline, deadline_quote=deadline_quote,
+                              agreement_quote=agreement_quote)
 
 
 def draft(decisions=(), actions=()):
@@ -92,12 +95,12 @@ def test_invented_action_item_is_dropped():
 def test_doubtful_lines_are_marked_and_not_evidence():
     for_llm, evidence = format_transcript(SEGMENTS, doubtful={9})
     assert "[9] [DOUBTFUL] Thanks for watching!" in for_llm
-    assert "Thanks for watching" not in evidence
+    assert all(line != 9 for line, _ in evidence)
 
 
 def test_quote_from_doubtful_line_does_not_count():
     a = action("Like the video", "Thanks for watching!")
-    result = verify(draft(actions=[a]), format_transcript(SEGMENTS, {9})[1])
+    result = verify(draft(actions=[a]), QuoteIndex(format_transcript(SEGMENTS, {9})[1]))
     assert result.minutes.action_items == []
 
 
@@ -125,3 +128,42 @@ def test_markdown_and_json_have_same_content():
     for value in [js["summary"], js["decisions"][0]["text"], js["decisions"][0]["status"],
                   js["action_items"][0]["owner"], js["action_items"][0]["deadline"]]:
         assert value in md
+
+
+def test_decision_evidence_has_every_quote_with_timestamps():
+    d = decision("Rubber case", "I propose we make the case out of rubber",
+                 agree=["rubber is a good idea, let's go with that"])
+    ev = verify(draft([d]), EVIDENCE).minutes.decisions[0].evidence
+    assert [(e.role, e.line, e.start) for e in ev] == [("proposal", 1, 10.0), ("agreement", 2, 20.0)]
+
+
+def test_action_status_agreed_proposed_unassigned():
+    agreed = action("Send cost spreadsheet", "Sarah will send the cost spreadsheet by Friday",
+                    owner="Sarah", owner_quote="Sarah will send the cost spreadsheet",
+                    agreement_quote="Sarah will send the cost spreadsheet by Friday")
+    proposed = action("Send cost spreadsheet", "Sarah will send the cost spreadsheet by Friday",
+                      owner="Sarah", owner_quote="Sarah will send the cost spreadsheet")
+    unassigned = action("Check battery supplier", "Someone should also check the battery supplier",
+                        agreement_quote="Mm-hmm.")
+    items = verify(draft(actions=[agreed, proposed, unassigned]), EVIDENCE).minutes.action_items
+    assert [a.status for a in items] == ["agreed", "proposed", "unassigned"]
+
+
+def test_invented_agreement_quote_keeps_action_proposed():
+    a = action("Send cost spreadsheet", "Sarah will send the cost spreadsheet by Friday",
+               owner="Sarah", owner_quote="Sarah will send the cost spreadsheet",
+               agreement_quote="Sarah said she would love to do it")
+    result = verify(draft(actions=[a]), EVIDENCE)
+    assert result.minutes.action_items[0].status == "proposed"
+    assert any("agreement quote not verified" in n for n in result.dropped)
+
+
+def test_checks_count_what_was_kept_and_removed():
+    d_ok = decision("Rubber case", "I propose we make the case out of rubber", agree=["let's go with that"])
+    d_bad = decision("Titanium case", "We agreed to use a titanium case")
+    a = action("Check battery supplier", "Someone should also check the battery supplier",
+               owner="John", owner_quote="John will check it")
+    checks = verify(draft([d_ok, d_bad], [a]), EVIDENCE).checks
+    assert (checks["decisions_proposed"], checks["decisions_kept"], checks["decisions_agreed"]) == (2, 1, 1)
+    assert checks["owners_removed"] == 1
+    assert support_rate(checks) == round(2 / 3, 3)

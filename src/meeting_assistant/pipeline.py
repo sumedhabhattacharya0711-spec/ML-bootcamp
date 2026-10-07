@@ -23,7 +23,7 @@ from pathlib import Path
 from meeting_assistant import llm
 from meeting_assistant.glossary import Term, build_glossary, load_packs, merge_terms, parse_user_terms
 from meeting_assistant.hallucination import SegmentFlag, doubtful_indices, score_segments
-from meeting_assistant.minutes import MinutesResult, to_json, to_markdown, write_minutes
+from meeting_assistant.minutes import MinutesResult, support_rate, to_json, to_markdown, write_minutes
 from meeting_assistant.paths import RUNS_DIR
 from meeting_assistant.refine import RefineResult, refine
 from meeting_assistant.stt import AudioInputError, Transcript, transcribe
@@ -121,7 +121,8 @@ def run(audio_path, model, glossary_text: str = "", packs: list[str] | None = No
     started = start(minutes_stage)
     minutes_input = result.refined.refined if result.refined else lines
     try:
-        result.minutes = write_minutes(minutes_input, call_structured, doubtful)
+        result.minutes = write_minutes(minutes_input, call_structured, doubtful,
+                                       [seg.start for seg in segments])
         minutes_stage.status = "done"
         minutes_stage.message = f"{len(result.minutes.dropped)} items removed or downgraded by the checks"
     except Exception as e:
@@ -135,6 +136,21 @@ def run(audio_path, model, glossary_text: str = "", packs: list[str] | None = No
 
 def _since(started: float) -> float:
     return round(time.perf_counter() - started, 2)
+
+
+def faithfulness_report(result: PipelineResult) -> dict:
+    """Per-run counts behind the "nothing invented" rules: evidence support for
+    the record, removed owners/deadlines, and the refine guard's blocks."""
+    report = dict(result.minutes.checks) if result.minutes else {}
+    if result.minutes:
+        report["evidence_support_rate"] = support_rate(result.minutes.checks)
+    if result.refined:
+        edits = result.refined.edits
+        report["edits_applied"] = sum(e.status == "applied" for e in edits)
+        for reason in ("touches a number", "touches a negation", "changes words that were not hinted",
+                       "result is not a glossary term"):
+            report[f"edits_blocked: {reason}"] = sum(e.reason == reason for e in edits)
+    return report
 
 
 def save(result: PipelineResult, runs_dir: Path, usage) -> Path:
@@ -157,6 +173,7 @@ def save(result: PipelineResult, runs_dir: Path, usage) -> Path:
         "flags": [asdict(f) for f in result.flags],
         "glossary": [asdict(t) for t in result.glossary],
         "minutes_dropped": result.minutes.dropped if result.minutes else [],
+        "faithfulness": faithfulness_report(result),
         "llm_usage": [asdict(u) for u in usage],
     }
     (run_dir / "run.json").write_text(json.dumps(details, indent=2, ensure_ascii=False), encoding="utf-8")
