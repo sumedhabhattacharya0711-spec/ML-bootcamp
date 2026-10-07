@@ -1,0 +1,134 @@
+[00:36.26] Sebastian: Okay, good morning everybody.
+[00:38.46] Sebastian: Good morning.
+[00:39.26] Sebastian: Oh, everybody's not ready.
+[00:41.68] Michael: Almost.
+[00:43.88] Michael: Ready.
+[00:43.96] Sebastian: All right.
+[00:45.12] Sebastian: Okay, let's go.
+[00:46.36] Sebastian: So we're here today to have our first kickoff meeting about this new project we're going
+[00:52.72] Sebastian: to talk about in a few minutes.
+[00:56.66] Sebastian: So I will be Sebastian, the project manager.
+[01:04.40] Michael: Michael, I'm the User Interface Designer.
+[01:07.82] Speaker 3: I'm Guillermo Radilla, I'm the Marketing Expert.
+[01:10.94] Speaker 3: And I'm Hemant, the Industrial Designer.
+[01:13.40] Sebastian: Okay, very good. Thanks for being here.
+[01:17.94] Sebastian: So, let's have a look to the agenda.
+[01:21.60] Sebastian: So, we are going to go through this agenda,
+[01:24.98] Sebastian: and mainly first to be used to the tools available in this nice and smart meeting room we have here.
+[01:36.56] Sebastian: Then we'll go to the plan of the project and have general discussions about it.
+[01:44.21] Sebastian: So the goal of this project is to develop a new remote control.
+[01:52.85] Sebastian: It should be original, trendy, and also user friendly.
+[02:03.91] Sebastian: As usual we will follow the project method that we are using in our company.
+[02:12.41] Sebastian: It is in three steps as you know, first the functional design, the second the conceptual
+[02:17.95] Sebastian: design and then the detailed design.
+[02:20.39] Sebastian: during each step of each design, you will work separately, individually on
+[02:31.31] Sebastian: your specific tasks and we will meet to discuss and take decisions about
+[02:39.17] Sebastian: what you did and what we will do next. So first we have to train
+[02:48.02] Sebastian: ourself with all the tools available in this nice meeting room and particularly the whiteboard.
+[02:58.48] Sebastian: So we are going to go through the whiteboard and take some notes or do some drawings.
+[03:06.94] Sebastian: So who wants to start?
+[03:11.75] Michael: Mr. McGrady?
+[03:12.51] Michael: I will if no one else wants to, yeah.
+[03:14.77] Michael: Okay, so I'm going to draw my favorite animal.
+[03:21.54] Michael: Let's see.
+[03:35.76] Michael: Well, I don't really have a favorite animal, but I have one in mind, so I'm going to tell
+[03:45.92] Michael: you about the spider because you can actually draw it pretty well in the corner of a white
+[03:52.96] Michael: board.
+[03:54.34] Michael: The spider lives in a web and has eight legs and it can move all about the web in two dimensions,
+[04:15.74] Michael: unless it's a three dimensional web which they have sometimes.
+[04:18.02] Michael: There are some spiders that live in like, they have like a big ball of a web.
+[04:23.76] Michael: And the other thing is some spiders can actually fly like they have, they're let out like a stream of like the web building material but it acts like a parachute so they can actually kind of go and find new, build new webs somewhere else.
+[04:41.08] Michael: So I think they did this in Charlotte's Web, that movie, that little, well it was actually a book first but at the end all the spiders kind of flew away.
+[04:51.16] Sebastian: Okay, thank you, very interesting.
+[04:57.78] Sebastian: Guillermo, do you want to?
+[05:02.26] Speaker 3: Okay, I don't know why, but when I was a child I wanted to be a panther.
+[05:12.91] Speaker 3: Not a pink panther.
+[05:14.07] Speaker 4: Maybe it's really difficult to draw a panther.
+[05:18.11] Speaker 4: It's okay, I don't like it.
+[05:18.93] Sebastian: It would be very funny for us.
+[05:37.50] Speaker 3: Okay, it's a friendly panther.
+[05:40.60] Michael: Maybe it's happy because it just ate someone.
+[05:53.32] Speaker 3: Actually, honestly, I don't know what's his behavior, I don't know if it's the male who
+[06:03.72] Speaker 3: hunts or if it's the female.
+[06:06.42] Speaker 3: I have watched that lions didn't hunt, it's the female lions who hunt, but I like it because
+[06:17.20] Speaker 3: This is fast and it's black as well so it can hide itself very easily and it looks like
+[06:33.86] Speaker 3: a powerful, strong...
+[06:39.16] Speaker 3: I don't know, I watched a film about a black panther when I was a child and I was in that
+[06:46.76] Speaker 3: when everything was choking me a lot okay
+[06:51.76] Sebastian: thank you okay I'm sure
+[07:06.06] Michael: they don't
+[07:07.00] Michael: like pink panthers I like it this
+[07:30.28] Speaker 4: lapis coming out once in a while it's not
+[07:33.08] Speaker 4: very strong okay so not the favorite animal but I think I'll draw elephant
+[07:43.12] Speaker 4: I'll try to draw elephants. Okay, so elephant goes like this. Let's assume and
+[07:58.51] Speaker 4: then it has four feet. I don't know whether there's any distance there
+[08:06.22] Speaker 4: should be any distance or not but I think this is the easiest. We have its
+[08:32.98] Speaker 4: hump. It seems that elephants are pretty friendly and they have one very important way, a different
+[08:43.50] Speaker 4: way of walking. So when they walk, wherever they are going to put their first feet, the
+[08:49.70] Speaker 4: second feet will always be, when they come to that position, the third feet will be there.
+[08:55.84] Speaker 4: That's the way they walk. And that's very peculiar about them. None of the other animals
+[09:00.38] Speaker 4: walk like this and they are very useful to human beings at least few few hundred
+[09:07.14] Speaker 4: years ago when there was no means of transportations or something or when
+[09:10.74] Speaker 4: they had to carry huge loads from one place to another elephants were very
+[09:15.54] Speaker 4: useful and they are found in usually the warm countries and they are the biggest
+[09:24.20] Speaker 4: terrestrial animal that's what I know about them so that's what I wanted to
+[09:29.36] Speaker 4: about?
+[09:29.88] Michael: So is this an Indian or an African elephant because you haven't drawn for years?
+[09:33.32] Speaker 4: There are two
+[09:33.54] Speaker 4: kind of yeah they are very different Indian and African elephants. So Indian elephant is having
+[09:39.04] Speaker 4: one bump I think and the African have two and then there is a difference in the trunk of the animals
+[09:45.20] Speaker 4: these elephants who are Indian and so at some for some elephants it's that trunk is having one
+[09:54.34] Speaker 4: Do we have some message there?
+[09:56.68] Sebastian: Yes, we have to...
+[09:58.36] Sebastian: I have to cut you, sorry.
+[10:00.76] Sebastian: Some other time. Thank you.
+[10:02.58] Sebastian: Thank you.
+[10:03.92] Michael: We can discuss that offline.
+[10:05.38] Sebastian: Yeah, we'll discuss offline.
+[10:07.20] Sebastian: Or we'll do another meeting about...
+[10:11.16] Sebastian: So, another important part of the project
+[10:15.59] Sebastian: is about money.
+[10:18.25] Sebastian: And about...
+[10:19.45] Sebastian: About finances.
+[10:23.31] Sebastian: So...
+[10:23.91] Sebastian: selling price of 25 euro for this remote control and we have which should generate a profit
+[10:33.93] Sebastian: of 50 million euros and we should target an international market.
+[10:42.39] Michael: So could I just ask one question, is this a standalone unit that we're going to be selling
+[10:48.25] Michael: so it's going to be you already have a TV but you're buying an extra remote control
+[10:52.03] Michael: for it or something?
+[10:52.75] Sebastian: But this is the next topic we have to discuss, exactly.
+[10:56.19] Sebastian: So let's go to it.
+[10:58.09] Sebastian: So we should decide which kind of remote control
+[11:02.41] Sebastian: we want to go.
+[11:05.57] Sebastian: Should it be specific remote control to some specific device?
+[11:10.73] Sebastian: Should it be a universal one?
+[11:13.89] Sebastian: And et cetera.
+[11:17.65] Sebastian: So I'm waiting for your inputs very quickly,
+[11:22.35] Sebastian: because we have only three minutes to go.
+[11:26.73] Michael: Okay, well, so it seems the first thing that they've kind of specified is the price like
+[11:34.55] Michael: based on how much profit we want to make, which seems to kind of a little strange if
+[11:39.29] Michael: we don't know what the product is yet, but I guess if that's the requirement that we
+[11:43.65] Michael: need to design the product to actually fit that price bracket.
+[11:50.09] Michael: So, I guess we're gonna need to find out what's actually,
+[11:53.37] Michael: you know, what people are willing to pay for,
+[11:56.89] Michael: what kind of product they're expecting for 25 euro,
+[11:59.37] Michael: because it seems quite a lot for remote control.
+[12:01.05] Sebastian: So, it's-
+[12:01.31] Sebastian: Okay, I think this is more a job to our-
+[12:04.39] Sebastian: Marketing person.
+[12:05.01] Sebastian: Marketing person, yeah.
+[12:06.11] Sebastian: So, it should be the topic of maybe after the next meeting,
+[12:09.51] Sebastian: just to have an overview of this,
+[12:11.89] Sebastian: and in which direction we should go.
+[12:14.49] Sebastian: So, we need to close the meeting.
+[12:16.71] Sebastian: We'll have a new meeting soon,
+[12:18.13] Sebastian: And so all the work, every of you have to do.
+[12:24.75] Sebastian: So you have to work on the working design.
+[12:29.45] Sebastian: You have to work on the technical functions.
+[12:32.91] Sebastian: And you have to work on user requirements, specs.
+[12:37.33] Sebastian: All right.
+[12:39.69] Sebastian: You will receive some information by email, as usual.
+[12:43.69] Sebastian: Thanks for coming today.
+[12:45.01] Speaker 4: Thanks.
+[12:45.53] Speaker 4: Thanks.
+[12:45.77] Speaker 4: All right.

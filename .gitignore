@@ -9,3 +9,5 @@ runs/*
 .pytest_cache/
 *.egg-info/
 .llm_cache/
+data/ami_annotations/
+data/ami_annotations.zip

@@ -1,0 +1,22 @@
+# Action items
+
+- Work on the working design
+  - owner: unspecified
+  - deadline: unspecified
+  - status: unassigned
+  - [12:24.75] Sebastian, task: "you have to work on the working design"
+- Work on the technical functions
+  - owner: unspecified
+  - deadline: unspecified
+  - status: unassigned
+  - [12:29.45] Sebastian, task: "you have to work on the technical functions"
+- Work on user requirements and specifications
+  - owner: unspecified
+  - deadline: unspecified
+  - status: unassigned
+  - [12:32.91] Sebastian, task: "you have to work on user requirements, specs"
+- Send project information by email to all participants
+  - owner: unspecified
+  - deadline: unspecified
+  - status: unassigned
+  - [12:39.69] Sebastian, task: "You will receive some information by email, as usual"

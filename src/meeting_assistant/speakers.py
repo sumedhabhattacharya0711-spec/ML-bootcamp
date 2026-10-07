@@ -582,7 +582,8 @@ def assign_names(speakers: list[Speaker], evidence: list[NameEvidence]) -> None:
     for s in speakers:
         if s.source != "edited":
             s.name, s.source, s.confidence, s.note = "", "", "", ""
-    done = {s.id for s in speakers if s.source == "edited"}
+    done = {s.id for s in speakers if s.source == "edited"}   # settled: named, edited or unclear
+    named = set(done)                                          # actually holding a name
     taken = {_norm(s.name) for s in speakers if s.source == "edited"}
 
     for (sid, name), score in sorted(points.items(), key=lambda kv: (-kv[1], kv[0])):
@@ -594,7 +595,9 @@ def assign_names(speakers: list[Speaker], evidence: list[NameEvidence]) -> None:
             by_id[sid].note = "unclear: " + " or ".join(tied)
             done.add(sid)
             continue
-        others = [s2 for (s2, n2), p in points.items() if n2 == name and s2 != sid and s2 not in done and p == score]
+        # A speaker set aside as unclear still competes for this name: only one
+        # that already holds a name of its own is out of the running.
+        others = [s2 for (s2, n2), p in points.items() if n2 == name and s2 != sid and s2 not in named and p == score]
         if others:  # the same name fits two speakers equally well
             for s2 in [sid] + others:
                 by_id[s2].note = f"unclear: {spelling[name]} could be {default_label(sid)} or " \
@@ -606,6 +609,7 @@ def assign_names(speakers: list[Speaker], evidence: list[NameEvidence]) -> None:
         sp.source = "self-introduction" if "self" in kinds[(sid, name)] else "addressed"
         sp.confidence = "high" if score >= HIGH_CONFIDENCE else "low"
         done.add(sid)
+        named.add(sid)
         taken.add(name)
 
 

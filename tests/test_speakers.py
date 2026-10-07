@@ -310,3 +310,18 @@ def test_role_given_by_name_goes_to_that_person():
     assert named_roles(evidence) == {"Courtney": "marketing person", "Sam": "industrial designer"}
     assert [e.reason for e in evidence if e.kind == "assigned_role" and not e.accepted] == [
         "the quote does not contain the role"]
+
+
+def test_unclear_speaker_still_blocks_a_tied_name():
+    # S1 is unclear (Priya or Rahul); S2 fits Priya exactly as well as S1 does,
+    # so Priya must not go to S2 either.
+    speakers = [Speaker("S1"), Speaker("S2")]
+    assign_names(speakers, [ev("S1", "Priya"), ev("S1", "Rahul"), ev("S2", "Priya")])
+    assert [s.name for s in speakers] == ["", ""]
+    assert "unclear" in speakers[1].note
+
+
+def test_speaker_already_named_does_not_block_another():
+    speakers = [Speaker("S1"), Speaker("S2")]
+    assign_names(speakers, [ev("S1", "Rahul", "self"), ev("S1", "Priya"), ev("S2", "Priya")])
+    assert [s.name for s in speakers] == ["Rahul", "Priya"]

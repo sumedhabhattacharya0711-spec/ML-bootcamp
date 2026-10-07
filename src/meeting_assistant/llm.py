@@ -174,7 +174,9 @@ def _send_to(provider: Provider, model: str, method: str, system: str, user: str
         messages=[{"role": "system", "content": system}, {"role": "user", "content": user}],
         **kwargs,
     )
-    params.update({k: v for k, v in OPTIONAL_PARAMS.items() if k not in _unsupported.get(model, set())})
+    # Optional params the model accepts; a value passed by the caller (e.g. a higher
+    # reasoning_effort) wins over the default.
+    params.update({k: kwargs.get(k, v) for k, v in OPTIONAL_PARAMS.items() if k not in _unsupported.get(model, set())})
 
     started = time.perf_counter()
     for limit in (MAX_OUTPUT_TOKENS, 2 * MAX_OUTPUT_TOKENS):
@@ -242,23 +244,27 @@ def _missing_field(e: ValidationError) -> str:
 
 
 def call_llm_structured(system: str, user: str, schema: type[BaseModel],
-                        model: str | None = None) -> BaseModel:
+                        model: str | None = None, reasoning_effort: str | None = None) -> BaseModel:
     """JSON call: OpenAI structured outputs force the reply into `schema`'s
     shape and we get a validated pydantic object back. One retry if the model
-    refuses or the reply doesn't validate."""
-    path = _cache_path(f"json:{schema.__name__}", model, system, user)
+    refuses or the reply doesn't validate. `reasoning_effort` overrides the
+    default "low" for harder calls (the meeting record uses "medium")."""
+    kind = f"json:{schema.__name__}" + (f":{reasoning_effort}" if reasoning_effort else "")
+    path = _cache_path(kind, model, system, user)
     if (hit := _cached(path)) is not None:
         return schema.model_validate(hit)
-    result = _structured(system, user, schema, model)
+    result = _structured(system, user, schema, model, reasoning_effort)
     _store(path, result.model_dump())
     return result
 
 
-def _structured(system: str, user: str, schema: type[BaseModel], model: str | None) -> BaseModel:
+def _structured(system: str, user: str, schema: type[BaseModel], model: str | None,
+                reasoning_effort: str | None = None) -> BaseModel:
     last_problem = ""
+    extra = {"reasoning_effort": reasoning_effort} if reasoning_effort else {}
     for _attempt in range(2):
         try:
-            response = _send("parse", system, user, model, response_format=schema)
+            response = _send("parse", system, user, model, response_format=schema, **extra)
         except ValidationError as e:  # parse() validates the reply itself and raises this
             last_problem = _missing_field(e)
             continue

@@ -1,0 +1,121 @@
+{
+  "participants": [
+    {
+      "name": "Daniel",
+      "role": "project manager"
+    },
+    {
+      "name": "Emma",
+      "role": "product designer"
+    },
+    {
+      "name": "Raj",
+      "role": "machine learning engineer"
+    },
+    {
+      "name": "Chloe",
+      "role": "marketing lead"
+    }
+  ],
+  "summary": "The team reviewed the management brief, confirming a June 1 launch and an €80,000 budget. They approved shipping the thermostat in matte white and rejected a Gold Edition for the initial launch. Prototype testing received strong user approval. Pricing for Europe was postponed pending a cost report. Action items were assigned for color samples, model evaluation, and the launch video.",
+  "discussion_points": [
+    "Management brief: launch date and budget",
+    "Prototype testing results",
+    "Decision on thermostat color",
+    "Discussion of Gold Edition",
+    "Model training and deployment platforms",
+    "App platform support",
+    "Potential future voice control",
+    "Pricing for Europe left open",
+    "Task assignments"
+  ],
+  "given": [
+    {
+      "fact": "The launch date is the 1st of June.",
+      "evidence": [
+        {
+          "role": "given",
+          "quote": "The launch date is the 1st of June.",
+          "speaker": "Daniel",
+          "time": "00:40.61",
+          "line": 9
+        }
+      ]
+    },
+    {
+      "fact": "The budget is 80,000 euro.",
+      "evidence": [
+        {
+          "role": "given",
+          "quote": "And our budget is 80,000 euro.",
+          "speaker": "Daniel",
+          "time": "00:40.61",
+          "line": 9
+        }
+      ]
+    }
+  ],
+  "assessments": [
+    {
+      "topic": "Prototype user satisfaction",
+      "verdict": "9 out of 10 users liked it",
+      "evidence": [
+        {
+          "role": "assessment",
+          "quote": "The prototype tested really well, 9 out of 10 users liked it.",
+          "speaker": "Raj",
+          "time": "00:48.17",
+          "line": 10
+        }
+      ]
+    }
+  ],
+  "proposals_not_decided": [
+    {
+      "proposal": "Do not offer a Gold Edition for the first launch.",
+      "status": "rejected",
+      "evidence": [
+        {
+          "role": "proposal",
+          "quote": "Should we also offer a Gold Edition?",
+          "speaker": "Chloe",
+          "time": "01:11.59",
+          "line": 14
+        },
+        {
+          "role": "rejection",
+          "quote": "No, a Gold Edition is too expensive for the first launch. Let's drop that.",
+          "speaker": "Daniel",
+          "time": "01:15.45",
+          "line": 15
+        }
+      ]
+    }
+  ],
+  "open_questions": [
+    {
+      "question": "Determine the price for Europe.",
+      "evidence": [
+        {
+          "role": "open question",
+          "quote": "We still need to decide the price for Europe.",
+          "speaker": "Daniel",
+          "time": "01:40.85",
+          "line": 19
+        }
+      ]
+    },
+    {
+      "question": "Finalize the price after receiving the cost report.",
+      "evidence": [
+        {
+          "role": "open question",
+          "quote": "Let's leave that open until we have the cost report.",
+          "speaker": "Daniel",
+          "time": "01:43.83",
+          "line": 20
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,28 @@
+[00:00.30] Daniel: Good morning, everyone. I'm Daniel the project manager
+[00:05.54] Daniel: Today we need to finalize the launch plan for our smart thermostat.
+[00:10.66] Emma: Hi everyone. I'm Emma the product designer
+[00:15.34] Daniel: Raj would you like to introduce yourself?
+[00:20.36] Raj: sure
+[00:20.68] Raj: I'm Raj the machine learning engineer. I
+[00:25.40] Raj: build the temperature prediction model
+[00:28.87] Chloe: and I'm Chloe the marketing lead
+[00:33.87] Daniel: Thanks, Chloe. First, the brief from management.
+[00:40.61] Daniel: The launch date is the 1st of June. And our budget is 80,000 euro.
+[00:48.17] Raj: Good news on testing. The prototype tested really well, 9 out of 10 users liked it.
+[00:56.82] Daniel: Thanks, Raj. That's great news.
+[01:00.86] Emma: I propose we ship the thermostat in matte white.
+[01:04.92] Raj: Yes, Mate White looks great. Let's go with that.
+[01:11.59] Chloe: Should we also offer a Gold Edition?
+[01:15.45] Daniel: No, a Gold Edition is too expensive for the first launch. Let's drop that.
+[01:22.51] Raj: For the model, we train on Kubeflow and deploy it on the device with ONNX.
+[01:30.13] Daniel: Okay. So the app will support both iPhone and Android.
+[01:36.06] Chloe: Maybe we could add voice control later.
+[01:40.85] Daniel: We still need to decide the price for Europe.
+[01:43.83] Daniel: Let's leave that open until we have the cost report.
+[01:48.50] Daniel: Now the tasks.
+[01:50.62] Daniel: Emma, can you send the final color samples?
+[01:54.86] Emma: Yes, I'll send the color samples by Friday.
+[01:59.30] Raj: And I'll finish the model evaluation report by next Wednesday.
+[02:05.00] Daniel: The marketing lead will prepare the launch video by the end of May.
+[02:10.84] Chloe: Sure. I'll take that on.
+[02:14.55] Daniel: Great. Thanks everyone. See you next week.

@@ -213,3 +213,28 @@ def test_empty_model_lines_in_env_keep_the_defaults():
                           "print(llm.PRIMARY.model, llm.BACKUP.model)"],
                          capture_output=True, text=True, env=env, check=True).stdout.split()
     assert out == ["openai/gpt-oss-120b", "gemini-2.5-flash"]
+
+
+def test_caller_reasoning_effort_overrides_the_default(monkeypatch):
+    from meeting_assistant import llm as llm_module
+    from pydantic import BaseModel
+
+    class Answer(BaseModel):
+        ok: bool
+
+    sent = {}
+
+    class FakeCompletions:
+        def parse(self, **params):
+            sent.update(params)
+            msg = type("M", (), {"refusal": None, "parsed": Answer(ok=True), "content": ""})()
+            choice = type("C", (), {"message": msg, "finish_reason": "stop"})()
+            return type("R", (), {"choices": [choice], "usage": None})()
+
+    client = type("Client", (), {"chat": type("Chat", (), {"completions": FakeCompletions()})()})()
+    monkeypatch.setattr(llm_module, "get_client", lambda provider: client)
+    monkeypatch.setenv("LLM_API_KEY", "test")
+    llm_module.call_llm_structured("s", "u", Answer, reasoning_effort="medium")
+    assert sent["reasoning_effort"] == "medium"
+    llm_module.call_llm_structured("s", "u2", Answer)
+    assert sent["reasoning_effort"] == "low"

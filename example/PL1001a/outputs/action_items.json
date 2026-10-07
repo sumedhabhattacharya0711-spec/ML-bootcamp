@@ -1,0 +1,82 @@
+[
+  {
+    "task": "Send the final color samples.",
+    "owner": "Emma",
+    "deadline": "by Friday",
+    "status": "agreed",
+    "evidence": [
+      {
+        "role": "task",
+        "quote": "Emma, can you send the final color samples?",
+        "speaker": "Daniel",
+        "time": "01:50.62",
+        "line": 22
+      },
+      {
+        "role": "owner",
+        "quote": "Yes, I'll send the color samples by Friday.",
+        "speaker": "Emma",
+        "time": "01:54.86",
+        "line": 23
+      },
+      {
+        "role": "deadline",
+        "quote": "by Friday",
+        "speaker": "Emma",
+        "time": "01:54.86",
+        "line": 23
+      }
+    ]
+  },
+  {
+    "task": "Finish the model evaluation report.",
+    "owner": "Raj",
+    "deadline": "by next Wednesday",
+    "status": "agreed",
+    "evidence": [
+      {
+        "role": "task",
+        "quote": "And I'll finish the model evaluation report by next Wednesday.",
+        "speaker": "Raj",
+        "time": "01:59.30",
+        "line": 24
+      },
+      {
+        "role": "deadline",
+        "quote": "by next Wednesday",
+        "speaker": "Raj",
+        "time": "01:59.30",
+        "line": 24
+      }
+    ]
+  },
+  {
+    "task": "Prepare the launch video.",
+    "owner": "Chloe",
+    "deadline": "by the end of May",
+    "status": "agreed",
+    "evidence": [
+      {
+        "role": "task",
+        "quote": "The marketing lead will prepare the launch video by the end of May.",
+        "speaker": "Daniel",
+        "time": "02:05.00",
+        "line": 25
+      },
+      {
+        "role": "deadline",
+        "quote": "by the end of May",
+        "speaker": "Daniel",
+        "time": "02:05.00",
+        "line": 25
+      },
+      {
+        "role": "owner",
+        "quote": "Sure. I'll take that on.",
+        "speaker": "Chloe",
+        "time": "02:10.84",
+        "line": 26
+      }
+    ]
+  }
+]

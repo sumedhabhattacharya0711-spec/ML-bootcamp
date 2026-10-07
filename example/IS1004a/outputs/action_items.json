@@ -1,0 +1,62 @@
+[
+  {
+    "task": "Work on the working design",
+    "owner": "unspecified",
+    "deadline": "unspecified",
+    "status": "unassigned",
+    "evidence": [
+      {
+        "role": "task",
+        "quote": "you have to work on the working design",
+        "speaker": "Sebastian",
+        "time": "12:24.75",
+        "line": 125
+      }
+    ]
+  },
+  {
+    "task": "Work on the technical functions",
+    "owner": "unspecified",
+    "deadline": "unspecified",
+    "status": "unassigned",
+    "evidence": [
+      {
+        "role": "task",
+        "quote": "you have to work on the technical functions",
+        "speaker": "Sebastian",
+        "time": "12:29.45",
+        "line": 126
+      }
+    ]
+  },
+  {
+    "task": "Work on user requirements and specifications",
+    "owner": "unspecified",
+    "deadline": "unspecified",
+    "status": "unassigned",
+    "evidence": [
+      {
+        "role": "task",
+        "quote": "you have to work on user requirements, specs",
+        "speaker": "Sebastian",
+        "time": "12:32.91",
+        "line": 127
+      }
+    ]
+  },
+  {
+    "task": "Send project information by email to all participants",
+    "owner": "unspecified",
+    "deadline": "unspecified",
+    "status": "unassigned",
+    "evidence": [
+      {
+        "role": "task",
+        "quote": "You will receive some information by email, as usual",
+        "speaker": "Sebastian",
+        "time": "12:39.69",
+        "line": 129
+      }
+    ]
+  }
+]
