@@ -8,3 +8,4 @@ runs/*
 !runs/.gitkeep
 .pytest_cache/
 *.egg-info/
+.llm_cache/

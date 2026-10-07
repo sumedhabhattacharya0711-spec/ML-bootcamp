@@ -226,3 +226,20 @@ was checked with the full test suite plus real runs on the AMI ES2004a clip.
   SelfCheckGPT (5x LLM calls vs free-tier limits), Self-Refine / ReAct / DSPy /
   RL (extra LLM rounds or training), pyannote speaker labels (needs HF token;
   optional in the brief).
+
+### Fix: weak hints and run-to-run determinism
+
+- **Hint thresholds (refine.py):** 72 -> 82 and 65 -> 75 (Whisper unsure),
+  tuned on ES2004a: real misheard terms scored 83+, everyday sound-alikes
+  74-80 ("point" -> Pound, "makes it" -> Market, "functions" -> Functional
+  design) and gpt-oss sometimes accepted them. Weak hints are no longer sent.
+- **Whisper (stt.py):** `temperature=0.0` turns off faster-whisper's sampling
+  fallback, so the same audio and hotwords give the same transcript.
+- **LLM (llm.py):** `seed` added next to `temperature 0` (both best effort on
+  Groq). Since Groq still varied, answers are cached in `.llm_cache/` keyed by
+  the exact model, prompt and input: the same input always gives the same
+  answer (`LLM_CACHE=0` turns it off; `run.json` shows cache hits as provider
+  "cache"). A first run on a new recording is still the LLM's own answer.
+- **Check:** two full ES2004a runs gave byte-identical raw/refined transcripts,
+  edit log, minutes.json and minutes.md; the second run used the cache for all
+  three LLM calls.

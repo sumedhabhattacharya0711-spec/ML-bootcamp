@@ -190,3 +190,12 @@ def test_rejected_reasoning_effort_is_dropped(fake):
     assert llm.call_llm("sys", "user", model="no-reasoning-test-model") == "OK"
     assert calls.calls[0]["reasoning_effort"] == "low"
     assert "reasoning_effort" not in calls.calls[1]
+
+
+def test_same_input_is_answered_from_cache(fake, monkeypatch, tmp_path):
+    monkeypatch.setenv("LLM_CACHE", "1")
+    monkeypatch.setattr(llm, "CACHE_DIR", tmp_path)
+    calls = fake(fake_response("first"), fake_response("second"))
+    assert llm.call_llm("sys", "same input") == "first"
+    assert llm.call_llm("sys", "same input") == "first"  # no second API call
+    assert len(calls.calls) == 1 and llm.usage_log[-1].provider == "cache"

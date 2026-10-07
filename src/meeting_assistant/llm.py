@@ -16,6 +16,7 @@ Try it:  python -m meeting_assistant.llm            (sends a tiny test message)
          python -m meeting_assistant.llm --models   (lists the models your key can use)
 """
 
+import hashlib
 import json
 import os
 import re
@@ -42,9 +43,12 @@ TIMEOUT_S = 60
 MAX_RETRIES = 3  # retries rate limits, timeouts and server errors, waiting as long as the
                  # provider asks (free tiers like Groq allow only a few thousand tokens per minute)
 
-# Sent when the model accepts them. Reasoning models (gpt-oss) reject temperature;
-# low reasoning effort keeps their hidden "thinking" from using up the output budget.
-OPTIONAL_PARAMS = {"temperature": TEMPERATURE, "reasoning_effort": "low"}
+# Sent when the model accepts them (a rejected one is dropped automatically).
+# temperature 0 + a fixed seed make answers as repeatable as the provider allows
+# (Groq and OpenAI treat seed as best effort); low reasoning effort keeps gpt-oss's
+# hidden "thinking" from using up the output budget.
+SEED = 0
+OPTIONAL_PARAMS = {"temperature": TEMPERATURE, "seed": SEED, "reasoning_effort": "low"}
 
 # Optional params each model rejected, filled in at runtime so they aren't sent again.
 _unsupported: dict[str, set[str]] = {}
@@ -83,6 +87,31 @@ class LLMUsage:
 
 # One entry per call, so pipeline.py can save tokens and timings into runs/.
 usage_log: list[LLMUsage] = []
+
+# Groq does not guarantee identical answers even with temperature 0 and a seed,
+# so answers are cached by their exact input: the same transcript, prompt and
+# model always give the same result. LLM_CACHE=0 in .env turns this off.
+CACHE_DIR = PROJECT_DIR / ".llm_cache"
+
+
+def _cache_path(kind: str, model: str | None, system: str, user: str):
+    if os.getenv("LLM_CACHE", "1") == "0":
+        return None
+    key = json.dumps([kind, model or PRIMARY.model, system, user], ensure_ascii=False)
+    return CACHE_DIR / f"{hashlib.sha256(key.encode()).hexdigest()}.json"
+
+
+def _cached(path):
+    if path is None or not path.exists():
+        return None
+    usage_log.append(LLMUsage(provider="cache", model="", input_tokens=0, output_tokens=0, seconds=0.0))
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _store(path, value) -> None:
+    if path is not None:
+        CACHE_DIR.mkdir(exist_ok=True)
+        path.write_text(json.dumps(value, ensure_ascii=False), encoding="utf-8")
 
 
 @lru_cache(maxsize=None)
@@ -194,8 +223,13 @@ def parse_json_reply(reply: str) -> dict:
 
 def call_llm(system: str, user: str, model: str | None = None) -> str:
     """Plain-text call: instructions in `system`, data in `user`. Returns the reply."""
+    path = _cache_path("text", model, system, user)
+    if (hit := _cached(path)) is not None:
+        return hit
     response = _send("create", system, user, model)
-    return response.choices[0].message.content or ""
+    reply = response.choices[0].message.content or ""
+    _store(path, reply)
+    return reply
 
 
 def _missing_field(e: ValidationError) -> str:
@@ -210,6 +244,15 @@ def call_llm_structured(system: str, user: str, schema: type[BaseModel],
     """JSON call: OpenAI structured outputs force the reply into `schema`'s
     shape and we get a validated pydantic object back. One retry if the model
     refuses or the reply doesn't validate."""
+    path = _cache_path(f"json:{schema.__name__}", model, system, user)
+    if (hit := _cached(path)) is not None:
+        return schema.model_validate(hit)
+    result = _structured(system, user, schema, model)
+    _store(path, result.model_dump())
+    return result
+
+
+def _structured(system: str, user: str, schema: type[BaseModel], model: str | None) -> BaseModel:
     last_problem = ""
     for _attempt in range(2):
         try:

@@ -168,6 +168,7 @@ def transcribe(path: str | Path, model, glossary_terms: list[Term] | None = None
         # initial_prompt only reaches the first 30-second window; hotwords reach all.
         hotwords=hotwords or None,
         condition_on_previous_text=False,  # stops one chunk's text looping into the next
+        temperature=0.0,                   # no sampling fallback: same audio, same transcript
     )
     segments = []
     # float(): faster-whisper returns numpy floats for times and word probabilities;

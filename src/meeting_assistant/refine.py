@@ -34,10 +34,13 @@ from meeting_assistant.paths import PROMPTS_DIR
 
 PROMPT_PATH = PROMPTS_DIR / "refine_system.txt"
 
-# ---------- Settings (starting values; eval.py tunes them) ----------
+# ---------- Settings (tuned on the AMI ES2004a meeting) ----------
 
-MATCH_SCORE = 72          # average score needed for a hint
-MATCH_SCORE_UNSURE = 65   # ... when Whisper was unsure of a word in the span
+# Real misheard terms scored 83+ ("Laura" -> LoRA 83.3, "tally text" -> Teletext 85.3);
+# everyday sound-alikes scored 74-80 ("point" -> Pound 80, "makes it" -> Market 76),
+# and the LLM sometimes accepted those. So weak hints are not sent at all.
+MATCH_SCORE = 82          # average score needed for a hint (was 72)
+MATCH_SCORE_UNSURE = 75   # ... when Whisper was unsure of a word in the span (was 65)
 UNSURE_PROB = 0.5         # word.probability below this = Whisper was unsure
 MAX_SPAN_WORDS = 5
 MAX_HINTS = 15

@@ -50,13 +50,20 @@ def test_correct_term_gives_no_hint():
 
 
 def test_unsure_word_uses_lower_threshold():
-    # "grabant" vs Grafana scores 69: no hint normally (needs > 72),
-    # a hint when Whisper was unsure of that word (needs > 65).
-    assert 65 < score_match("grabant", "Grafana")[2] <= 72
-    sure = find_hints([seg("check grabant now", [0.9, 0.9, 0.9])], ["Grafana"])
-    unsure = find_hints([seg("check grabant now", [0.9, 0.2, 0.9])], ["Grafana"])
+    # "point" vs Pound scores 80: no hint normally (needs > 82),
+    # a hint when Whisper was unsure of that word (needs > 75).
+    assert 75 < score_match("point", "Pound")[2] <= 82
+    sure = find_hints([seg("a key point now", [0.9, 0.9, 0.9, 0.9])], ["Pound"])
+    unsure = find_hints([seg("a key point now", [0.9, 0.9, 0.2, 0.9])], ["Pound"])
     assert sure == []
     assert len(unsure) == 1 and unsure[0].unsure
+
+
+def test_everyday_sound_alikes_from_es2004a_are_not_hinted():
+    lines = ["that was my main point, we do have to use metal",
+             "which makes it fairly obvious what you're trying to do.",
+             "to the other functions when you can do sound or options"]
+    assert find_hints(lines, ["Pound", "Market", "Functional design"]) == []
 
 
 def test_hints_capped_and_non_overlapping():
