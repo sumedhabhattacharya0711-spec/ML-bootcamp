@@ -167,3 +167,9 @@ def test_short_spoken_forms_still_hinted():
              ("follow G D P R rules.", "GDPR"), ("written in pie torch.", "PyTorch")]
     for line, term in pairs:
         assert [h.term for h in find_hints([line], [term])] == [term], line
+
+
+def test_correct_multi_word_term_gives_no_hint():
+    # Same words, different capitals and punctuation: nothing to fix.
+    assert find_hints(["I'm Sarah, project manager, and this is our meeting."], ["Project manager"]) == []
+    assert [h.term for h in find_hints(["follow G D P R rules."], ["GDPR"])] == ["GDPR"]

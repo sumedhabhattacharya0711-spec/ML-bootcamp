@@ -12,10 +12,11 @@ class Answer(BaseModel):
     owner: str
 
 
-def fake_response(content="", parsed=None, refusal=None):
+def fake_response(content="", parsed=None, refusal=None, finish_reason="stop"):
     message = SimpleNamespace(content=content, parsed=parsed, refusal=refusal)
     usage = SimpleNamespace(prompt_tokens=10, completion_tokens=2)
-    return SimpleNamespace(choices=[SimpleNamespace(message=message)], usage=usage)
+    return SimpleNamespace(choices=[SimpleNamespace(message=message, finish_reason=finish_reason)],
+                           usage=usage)
 
 
 class FakeCompletions:
@@ -161,3 +162,31 @@ def test_both_providers_failing_gives_one_error(fake_both):
               [api_error(openai.InternalServerError, "down", 503)])
     with pytest.raises(llm.LLMError, match="groq: rate limited.*gemini: error 503"):
         llm.call_llm("sys", "user")
+
+
+def test_cut_off_answer_is_retried_with_a_larger_limit(fake):
+    calls = fake(fake_response('{"lines": {"3": "half a sen', finish_reason="length"),
+                 fake_response('{"lines": {}}'))
+    assert llm.call_llm("sys", "user") == '{"lines": {}}'
+    assert [c["max_tokens"] for c in calls.calls] == [llm.MAX_OUTPUT_TOKENS, 2 * llm.MAX_OUTPUT_TOKENS]
+
+
+def test_cut_off_structured_answer_is_retried(fake):
+    cut_off = openai.LengthFinishReasonError(completion=fake_response(finish_reason="length"))
+    calls = fake(cut_off, fake_response(parsed=Answer(owner="Sarah")))
+    assert llm.call_llm_structured("sys", "user", Answer).owner == "Sarah"
+    assert len(calls.calls) == 2
+
+
+def test_cut_off_twice_gives_a_clear_error(fake):
+    fake(fake_response("{", finish_reason="length"), fake_response("{", finish_reason="length"))
+    with pytest.raises(llm.LLMError, match="cut off .* even after retrying"):
+        llm.call_llm("sys", "user")
+
+
+def test_rejected_reasoning_effort_is_dropped(fake):
+    calls = fake(api_error(openai.BadRequestError, "reasoning_effort is not supported", 400),
+                 fake_response("OK"))
+    assert llm.call_llm("sys", "user", model="no-reasoning-test-model") == "OK"
+    assert calls.calls[0]["reasoning_effort"] == "low"
+    assert "reasoning_effort" not in calls.calls[1]

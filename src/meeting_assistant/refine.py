@@ -142,7 +142,9 @@ def find_hints(segments, glossary, doubtful: set[int] | None = None) -> list[Hin
     """Score every span of every line against every glossary term and keep the
     best non-overlapping matches, at most MAX_HINTS."""
     doubtful = doubtful or set()
-    terms = [(t, _clean(t)) for t in (_term_text(g) for g in glossary) if _clean(t)]
+    # Each term as one cleaned word ("kubeflow") and as cleaned words ("project manager").
+    terms = [(t, _clean(t), " ".join(_clean(w) for w in t.split()))
+             for t in (_term_text(g) for g in glossary) if _clean(t)]
     found = []
     for line, seg in enumerate(segments):
         if line in doubtful:
@@ -160,9 +162,10 @@ def find_hints(segments, glossary, doubtful: set[int] | None = None) -> list[Hin
             heard = " ".join(tokens[start:end])
             unsure = probs is not None and min(probs[start:end]) < UNSURE_PROB
             threshold = MATCH_SCORE_UNSURE if unsure else MATCH_SCORE
-            for term, term_clean in terms:
-                if any(term_clean in w for w in span_words):
-                    continue  # one word already is the term ("in Grafana."); "G D P R" still counts
+            span_text = " ".join(span_words)
+            for term, term_clean, term_words in terms:
+                if f" {term_words} " in f" {span_text} " or any(term_clean in w for w in span_words):
+                    continue  # already the term ("project manager,", "in Grafana."); "G D P R" still counts
                 if not 0.5 <= len(heard_clean) / len(term_clean) <= 2:
                     continue  # lengths too different to be the same word
                 sound, spelling, score = score_match(heard, term)

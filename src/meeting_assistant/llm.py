@@ -37,12 +37,17 @@ load_dotenv(PROJECT_DIR / ".env")
 GROQ_URL = "https://api.groq.com/openai/v1"
 GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/openai/"
 TEMPERATURE = 0
+MAX_OUTPUT_TOKENS = 8192  # doubled once if an answer is cut off
 TIMEOUT_S = 60
 MAX_RETRIES = 3  # retries rate limits, timeouts and server errors, waiting as long as the
                  # provider asks (free tiers like Groq allow only a few thousand tokens per minute)
 
-# Models that rejected the temperature setting (reasoning models). Filled in at runtime.
-_no_temperature: set[str] = set()
+# Sent when the model accepts them. Reasoning models (gpt-oss) reject temperature;
+# low reasoning effort keeps their hidden "thinking" from using up the output budget.
+OPTIONAL_PARAMS = {"temperature": TEMPERATURE, "reasoning_effort": "low"}
+
+# Optional params each model rejected, filled in at runtime so they aren't sent again.
+_unsupported: dict[str, set[str]] = {}
 
 
 @dataclass(frozen=True)
@@ -108,8 +113,6 @@ def _reason(e: Exception, provider: Provider, model: str) -> str:
         return "could not reach the API (check the internet connection)."
     if isinstance(e, openai.NotFoundError):
         return f"model not found or not available to this key: {model}"
-    if isinstance(e, openai.LengthFinishReasonError):
-        return "the answer was cut off because it was too long."
     if isinstance(e, openai.APIStatusError):
         return f"error {e.status_code}: {e.message}"
     return str(e)
@@ -132,36 +135,49 @@ def _send(method: str, system: str, user: str, model: str | None, **kwargs):
 
 
 def _send_to(provider: Provider, model: str, method: str, system: str, user: str, **kwargs):
-    """One request to one provider. Records usage. Retries once without
-    temperature if the model rejects it."""
+    """One request to one provider. Records usage. If the answer is cut off at
+    the output limit, asks again once with double the limit."""
     client = get_client(provider)
     params = dict(
         model=model,
         messages=[{"role": "system", "content": system}, {"role": "user", "content": user}],
         **kwargs,
     )
-    if model not in _no_temperature:
-        params["temperature"] = TEMPERATURE
+    params.update({k: v for k, v in OPTIONAL_PARAMS.items() if k not in _unsupported.get(model, set())})
 
     started = time.perf_counter()
-    try:
-        response = getattr(client.chat.completions, method)(**params)
-    except openai.BadRequestError as e:
-        if "temperature" not in str(e) or "temperature" not in params:
-            raise
-        _no_temperature.add(model)  # reasoning model: remember and resend without it
-        params.pop("temperature")
-        response = getattr(client.chat.completions, method)(**params)
+    for limit in (MAX_OUTPUT_TOKENS, 2 * MAX_OUTPUT_TOKENS):
+        params["max_tokens"] = limit
+        try:
+            response = _create(client, method, params, model)
+        except openai.LengthFinishReasonError:  # parse() raises this for a cut-off answer
+            continue
+        if response.choices[0].finish_reason == "length":
+            continue
+        usage = response.usage
+        usage_log.append(LLMUsage(
+            provider=provider.name,
+            model=model,
+            input_tokens=usage.prompt_tokens if usage else 0,
+            output_tokens=usage.completion_tokens if usage else 0,
+            seconds=round(time.perf_counter() - started, 2),
+        ))
+        return response
+    raise LLMError(f"LLM call failed: {provider.name}: the answer was cut off at {limit} tokens, "
+                   "even after retrying with a larger limit.")
 
-    usage = response.usage
-    usage_log.append(LLMUsage(
-        provider=provider.name,
-        model=model,
-        input_tokens=usage.prompt_tokens if usage else 0,
-        output_tokens=usage.completion_tokens if usage else 0,
-        seconds=round(time.perf_counter() - started, 2),
-    ))
-    return response
+
+def _create(client: openai.OpenAI, method: str, params: dict, model: str):
+    """Call chat.completions.<method>; drop any optional param the model rejects."""
+    while True:
+        try:
+            return getattr(client.chat.completions, method)(**params)
+        except openai.BadRequestError as e:
+            rejected = next((p for p in OPTIONAL_PARAMS if p in params and p in str(e)), None)
+            if rejected is None:
+                raise
+            _unsupported.setdefault(model, set()).add(rejected)
+            params.pop(rejected)
 
 
 def parse_json_reply(reply: str) -> dict:

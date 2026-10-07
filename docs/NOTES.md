@@ -145,3 +145,24 @@ was checked with the full test suite plus real runs on the AMI ES2004a clip.
 - **Checks:** 3 new tests (rate-limited Groq falls back; bad Groq key does
   not; both failing gives one error). Live: with Groq made unreachable on
   purpose, the test call was answered by Gemini; normal runs use Groq.
+
+### Fix: Stage 2 answer cut off ("LLM reply contained no JSON object")
+
+- **Cause (reproduced):** Groq returned `finish_reason: "length"`: gpt-oss
+  used most of the 3,072-token default output budget on hidden reasoning and
+  the JSON was cut off mid-word. The answer was long because refine.py sent 15
+  fake hints: everyday multi-word glossary terms ("project manager,",
+  "selling price") that were already spelled right. The "already the term"
+  check only worked for one-word terms.
+- **refine.py:** a span is skipped when it already contains the term's words
+  (ignoring capitals and punctuation). "G D P R" -> GDPR still gets a hint.
+- **llm.py:** every call sends `max_tokens` (8,192) and `reasoning_effort:
+  "low"` (dropped automatically for models that reject it, like temperature).
+  A cut-off answer is retried once with double the limit; only then
+  "the answer was cut off ... even after retrying". Truncated answers are never
+  used, because a half answer would put half sentences into the transcript.
+- **Result on ES2004a:** Stage 2 completes (refine call 1,226 output tokens,
+  was 3,072 and cut off); Stage 3 13.5 s (was 52 s).
+- **Tests:** 5 new (multi-word term already correct; cut-off retried for text
+  and structured calls; cut off twice gives the error; rejected
+  reasoning_effort dropped).
