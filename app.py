@@ -37,6 +37,25 @@ MODEL_CHOICES = [
      "(then falls back to CPU, very slow), invents text over silence more often", "large-v3"),
 ]
 STATUS_HEADERS = ["Stage", "Status", "Time (s)", "Message"]
+
+# Light, neutral theme: slate greys with one blue accent, system fonts (no web-font download).
+THEME = gr.themes.Base(
+    primary_hue="blue",
+    neutral_hue="slate",
+    font=[gr.themes.Font(f) for f in ("Inter", "Segoe UI", "system-ui", "sans-serif")],
+    font_mono=[gr.themes.Font(f) for f in ("Cascadia Mono", "Consolas", "ui-monospace", "monospace")],
+    radius_size="sm",
+).set(
+    body_background_fill="#f8fafc",
+    block_background_fill="#ffffff",
+    block_border_color="#e2e8f0",
+    block_label_text_weight="600",
+    button_primary_background_fill="#1e40af",
+    button_primary_background_fill_hover="#1d4ed8",
+    button_primary_text_color="#ffffff",
+)
+# Always light, even when the browser prefers dark mode.
+FORCE_LIGHT_JS = "() => { document.body.classList.remove('dark'); }"
 SAVED_FILES = ["minutes.md", "minutes.json", "transcript_raw.txt", "transcript_refined.txt",
                "edit_log.json", "run.json"]
 
@@ -297,4 +316,5 @@ if __name__ == "__main__":
 
     demo = build_ui(args.model_size)
     demo.queue(default_concurrency_limit=1)  # one GPU, one model: one run at a time
-    demo.launch(server_name="127.0.0.1", server_port=args.port)
+    demo.launch(server_name="127.0.0.1", server_port=args.port, theme=THEME, js=FORCE_LIGHT_JS,
+                footer_links=[])
