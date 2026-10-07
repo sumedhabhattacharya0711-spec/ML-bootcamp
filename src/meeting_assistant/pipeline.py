@@ -35,7 +35,7 @@ STAGES = ["Stage 1: speech-to-text", "Stage 1b: hallucination flags",
 @dataclass
 class StageStatus:
     name: str
-    status: str = "waiting"   # waiting, done, failed or skipped
+    status: str = "waiting"   # waiting, running, done, failed or skipped
     message: str = ""
     seconds: float = 0.0
 
@@ -61,14 +61,26 @@ class PipelineResult:
 
 def run(audio_path, model, glossary_text: str = "", packs: list[str] | None = None,
         call_llm=llm.call_llm, call_structured=llm.call_llm_structured,
-        model_size: str = "medium", runs_dir: Path = RUNS_DIR) -> PipelineResult:
+        model_size: str = "medium", runs_dir: Path = RUNS_DIR, on_stage=None) -> PipelineResult:
     """Run every stage on one recording. `model` is a loaded faster-whisper
-    model (stt.load_model), loaded once by the caller and reused."""
+    model (stt.load_model), loaded once by the caller and reused. `on_stage`,
+    if given, is called with the result whenever a stage starts or ends, so a
+    UI can show progress."""
     result = PipelineResult(stages=[StageStatus(name) for name in STAGES])
     stt_stage, flag_stage, refine_stage, minutes_stage = result.stages
     usage_start = len(llm.usage_log)
 
-    started = time.perf_counter()
+    def start(stage: StageStatus) -> float:
+        stage.status = "running"
+        if on_stage:
+            on_stage(result)
+        return time.perf_counter()
+
+    def finished() -> None:
+        if on_stage:
+            on_stage(result)
+
+    started = start(stt_stage)
     try:
         # Typed and pack terms are known before Whisper runs, so they can bias its spelling.
         typed_terms = merge_terms(parse_user_terms(glossary_text), load_packs(packs) if packs else [])
@@ -78,19 +90,22 @@ def run(audio_path, model, glossary_text: str = "", packs: list[str] | None = No
         for stage in result.stages[1:]:
             stage.status, stage.message = "skipped", "no transcript"
         result.run_dir = save(result, runs_dir, llm.usage_log[usage_start:])
+        finished()
         return result
     stt_stage.status, stt_stage.seconds = "done", _since(started)
     stt_stage.message = f"{len(result.transcript.segments)} segments"
+    finished()
     segments = result.transcript.segments
     lines = [s.text for s in segments]
 
-    started = time.perf_counter()
+    started = start(flag_stage)
     result.flags = score_segments(segments, result.transcript.duration_s)
     doubtful = doubtful_indices(result.flags)
     flag_stage.status, flag_stage.seconds = "done", _since(started)
     flag_stage.message = f"{len(doubtful)} of {len(segments)} segments flagged"
+    finished()
 
-    started = time.perf_counter()
+    started = start(refine_stage)
     try:
         result.glossary, warnings = build_glossary(glossary_text, lines, call_llm, packs, doubtful)
         result.refined = refine(segments, result.glossary, call_llm, doubtful)
@@ -101,8 +116,9 @@ def run(audio_path, model, glossary_text: str = "", packs: list[str] | None = No
     except Exception as e:  # LLMError or anything else: Stage 3 still runs on the raw text
         refine_stage.status, refine_stage.message = "failed", str(e)
     refine_stage.seconds = _since(started)
+    finished()
 
-    started = time.perf_counter()
+    started = start(minutes_stage)
     minutes_input = result.refined.refined if result.refined else lines
     try:
         result.minutes = write_minutes(minutes_input, call_structured, doubtful)
@@ -113,6 +129,7 @@ def run(audio_path, model, glossary_text: str = "", packs: list[str] | None = No
     minutes_stage.seconds = _since(started)
 
     result.run_dir = save(result, runs_dir, llm.usage_log[usage_start:])
+    finished()
     return result
 
 

@@ -187,3 +187,20 @@ was checked with the full test suite plus real runs on the AMI ES2004a clip.
   4 stages done.
 - **Tests:** 2 new (edit outside the hinted words is blocked; "mean" is not
   hinted as menu); guard tests now pass the hinted word ranges.
+
+## app.py (Gradio UI)
+
+- `python app.py` serves on http://127.0.0.1:7860 (localhost only);
+  `--model-size small|medium|turbo|large-v3`, `--port`.
+- Whisper loads once at startup; the size dropdown swaps the single loaded
+  model on the next Run (old one freed first). One run at a time
+  (`queue(default_concurrency_limit=1)`).
+- Run is the only event. `pipeline.run` runs in a worker thread; its new
+  optional `on_stage` callback (pipeline.py, the only backend change) streams
+  the status table live. Old results are cleared when a run starts.
+- Shows: status per stage, what the result was produced from (file, model,
+  device, LLM, hotwords, glossary, packs, run folder), meeting record + items
+  removed by the checks, raw transcript (low-confidence words p<0.5 and
+  possible hallucinations marked) beside the refined one (applied edits
+  marked), tables for segments / edit log / hints / possible errors / glossary
+  / LLM calls, and the saved files + run.json.

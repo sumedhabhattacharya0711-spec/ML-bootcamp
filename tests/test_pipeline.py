@@ -101,3 +101,12 @@ def test_failed_run_is_saved_too(tmp_path):
     r = run(empty, FakeWhisper(), runs_dir=tmp_path / "runs")
     saved = json.loads((r.run_dir / "run.json").read_text())
     assert saved["stages"][0]["status"] == "failed"
+
+
+def test_on_stage_reports_progress(audio, tmp_path):
+    seen = []
+    run(audio, FakeWhisper(), "Kubeflow", call_llm=fake_llm, call_structured=fake_structured,
+        runs_dir=tmp_path / "runs", on_stage=lambda r: seen.append([s.status for s in r.stages]))
+    assert seen[0] == ["running", "waiting", "waiting", "waiting"]
+    assert ["done", "done", "running", "waiting"] in seen
+    assert seen[-1] == ["done"] * 4
