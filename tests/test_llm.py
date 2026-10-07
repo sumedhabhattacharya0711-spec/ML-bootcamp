@@ -199,3 +199,17 @@ def test_same_input_is_answered_from_cache(fake, monkeypatch, tmp_path):
     assert llm.call_llm("sys", "same input") == "first"
     assert llm.call_llm("sys", "same input") == "first"  # no second API call
     assert len(calls.calls) == 1 and llm.usage_log[-1].provider == "cache"
+
+
+def test_empty_model_lines_in_env_keep_the_defaults():
+    """.env.example has empty "LLM_MODEL=" lines; they must not erase the defaults.
+    Checked in a fresh interpreter, because the providers are set up on import."""
+    import os
+    import subprocess
+    import sys
+
+    env = dict(os.environ, LLM_MODEL="", LLM_GEMINI_MODEL="")
+    out = subprocess.run([sys.executable, "-c", "from meeting_assistant import llm; "
+                          "print(llm.PRIMARY.model, llm.BACKUP.model)"],
+                         capture_output=True, text=True, env=env, check=True).stdout.split()
+    assert out == ["openai/gpt-oss-120b", "gemini-2.5-flash"]

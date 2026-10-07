@@ -62,10 +62,12 @@ class Provider:
     model: str
 
 
+# `or`, not a getenv default: .env.example has empty "LLM_MODEL=" lines, which
+# would otherwise override the defaults with "".
 PRIMARY = Provider("groq", "LLM_API_KEY", os.getenv("LLM_BASE_URL") or GROQ_URL,
-                   os.getenv("LLM_MODEL", "openai/gpt-oss-120b"))
+                   os.getenv("LLM_MODEL") or "openai/gpt-oss-120b")
 BACKUP = Provider("gemini", "LLM_GEMINI_KEY", GEMINI_URL,
-                  os.getenv("LLM_GEMINI_MODEL", "gemini-3.8-flash"))
+                  os.getenv("LLM_GEMINI_MODEL") or "gemini-2.5-flash")
 
 # Temporary provider problems: worth trying the backup.
 FALLBACK_ERRORS = (openai.RateLimitError, openai.APITimeoutError,
