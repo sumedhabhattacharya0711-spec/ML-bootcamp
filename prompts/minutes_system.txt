@@ -13,13 +13,19 @@ given: facts the meeting was handed rather than decided: the project brief, budg
 - quote: the exact words from the transcript where it was stated.
 Do not list these again under decisions.
 
-decisions: every proposal that was put forward for the group to decide. For each one:
+assessments: judgements the group made about something that already exists, such as ratings, scores, evaluations of a prototype or a presentation, and opinions on how good something is ("easy to use: 6 for me", "fashion, I'd say 7", "it's very promising"). For each one:
+- topic: what was judged, in a few words.
+- verdict: the judgement or score, in a few words.
+- quote: the exact words from the transcript where it was given.
+These are not decisions: never list them under decisions, even when everyone agrees on the score.
+
+decisions: every proposal for what to do or how the product or project will be (a feature, a material, a design, a price, a plan, a next step) that was put forward for the group to decide. For each one:
 - text: the proposal in one short sentence.
 - proposal_quote: the exact words from the transcript where it was proposed.
 - agreement_quotes: exact words from the transcript where people other than the proposer accepted it. Leave empty if nobody clearly accepted it.
 - rejection_quotes: exact words from the transcript where people rejected it. Leave empty if nobody rejected it.
 - settled_quote: the exact words where it was stated as settled or decided rather than suggested, for example "so the selling price will be 25 euro", "we're going with rubber", "it has to be shockproof". Use "" if it was only ever suggested ("maybe", "should we", "what about").
-Include proposals that were not agreed, and choices the group settled without discussing them further. Facts handed to the meeting (brief, budget, targets) belong under given, not here. Procedural remarks about running the meeting itself ("let's skip the whiteboard", "should we take notes") are not decisions. Do not decide whether it was agreed; just give the quotes.
+Include proposals that were not agreed, and choices the group settled without discussing them further. Not decisions: facts handed to the meeting (brief, budget, targets: under given), ratings and evaluations (under assessments), and remarks about running the meeting itself ("let's skip the whiteboard", "should we take notes", "let's move to the next item"). Do not decide whether it was agreed; just give the quotes.
 
 action_items: every task someone committed to or was given, including work handed out to roles for the next meeting. For each one:
 - task: the task in one short sentence.

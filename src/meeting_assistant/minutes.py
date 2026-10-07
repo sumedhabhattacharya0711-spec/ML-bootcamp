@@ -16,7 +16,9 @@ the owner of the task. When speakers stated their roles, a task given to a
 role ("the industrial designer will ...") is owned by the speaker with that role.
 
 Facts the meeting was handed (the brief, budget, prices, targets set by
-management) are listed under "given", not as decisions of the meeting.
+management) are listed under "given", and judgements about something that
+exists (ratings, scores, "it's easy to use") under "assessments": neither is a
+decision of the meeting.
 
 A proposal that nobody explicitly agreed to can still be "uncontested": it
 was stated as settled ("so the selling price will be 25 euro", not "maybe we
@@ -48,11 +50,28 @@ QUOTE_MIN_SCORE = 90  # rapidfuzz.partial_ratio needed for a quote to count as r
 # call must fit the prompt + transcript + answer; a 17-minute meeting is ~3.5K.
 SEGMENT_MAX_TOKENS = int(os.getenv("MINUTES_SEGMENT_TOKENS", "4000"))
 SAME_ITEM_SCORE = 85  # rapidfuzz.token_set_ratio at which items from two parts are the same
+# Reasoning effort for the record ("low" keeps gpt-oss's hidden reasoning from
+# using up the token budget); MINUTES_REASONING_EFFORT=medium spends more on it.
+REASONING_EFFORT = os.getenv("MINUTES_REASONING_EFFORT") or "low"
+
+
+def call_minutes_llm(system: str, user: str, schema):
+    """llm.call_llm_structured with the record's reasoning effort (MINUTES_REASONING_EFFORT)."""
+    from meeting_assistant import llm
+    return llm.call_llm_structured(system, user, schema, reasoning_effort=REASONING_EFFORT)
 
 # A quote with one of these commits its speaker to a task ("I'll send it", "let me check").
 # Matched on normalised text, where "I'll" is "i ll"; "i can t" (can't) is excluded.
+# Not when the next word is about thinking or talking, not doing ("I can see why",
+# "let me think", "I'll think about it").
 VOLUNTEER = re.compile(r"\b(i ll|i will|i shall|i can(?! t\b)|i m going to|i am going to|i m gonna|let me|"
-                       r"leave it (to|with) me|i ll take|i ve got (it|this))\b")
+                       r"leave it (to|with) me|i ll take|i ve got (it|this))\b"
+                       r"(?! (just |also |really )?(think|see|guess|imagine|understand|say|tell|admit|wonder|"
+                       r"suppose|know|mean|ask|agree|explain|repeat|be honest|put it)\b)")
+
+# A negation turns a settled-looking statement into a rejection ("we're not going
+# with titanium", "we won't use rubber"); matched on normalised text, "won't" is "won t".
+NEGATED = re.compile(r"\b(not|no|never|nobody|none|nothing|neither|nor|cannot|\w+n t)\b")
 
 # Hedged wording is a proposal, never a settled decision (matched on normalised
 # text, where "don't" is "don t"). Plain statements ("the selling price is 25
@@ -95,10 +114,18 @@ class GivenEvidence(BaseModel):
     quote: str
 
 
+class AssessmentEvidence(BaseModel):
+    topic: str
+    verdict: str
+    quote: str
+
+
 class MinutesDraft(BaseModel):
     given: list[GivenEvidence]  # facts handed to the meeting (brief, budget), not decided by it
     summary: str
     minutes: list[str]
+    # Before decisions on purpose: the model files ratings here before it lists decisions.
+    assessments: list[AssessmentEvidence]  # ratings and evaluations, not decisions
     decisions: list[DecisionEvidence]
     action_items: list[ActionItemEvidence]
     open_questions: list[OpenQuestionEvidence]
@@ -142,6 +169,13 @@ class GivenFact(BaseModel):
     evidence: list[Evidence] = []
 
 
+class Assessment(BaseModel):
+    topic: str
+    verdict: str
+    quote: str
+    evidence: list[Evidence] = []
+
+
 class Minutes(BaseModel):
     summary: str
     minutes: list[str]
@@ -149,6 +183,7 @@ class Minutes(BaseModel):
     action_items: list[ActionItem]
     open_questions: list[OpenQuestion] = []
     given: list[GivenFact] = []   # facts handed to the meeting (brief, budget, targets)
+    assessments: list[Assessment] = []  # ratings and evaluations made in the meeting
     participants: list[str] = []  # speaker names, when speakers are known
     roles: dict[str, str] = {}    # speaker name -> role they stated ("industrial designer")
 
@@ -158,6 +193,7 @@ class MinutesResult:
     minutes: Minutes
     dropped: list[str] = field(default_factory=list)  # what Python removed or downgraded, and why
     checks: dict = field(default_factory=dict)        # counts behind the faithfulness report
+    draft: MinutesDraft | None = None                 # the LLM's answer, kept so the checks can rerun
 
 
 # ---------- Quote checking ----------
@@ -262,9 +298,15 @@ def decide_status(d: DecisionEvidence, index: QuoteIndex,
     return ("rejected" if rejections else "open"), evidence, notes
 
 
-def is_settled_wording(quote: str) -> bool:
-    """ "So the selling price is 25 euro." yes; "Maybe it should be 25?" no."""
-    return bool(_norm(quote)) and not HEDGES.search(_norm(quote)) and "?" not in quote
+def is_settled_wording(quote: str, decision: str = "") -> bool:
+    """ "So the selling price is 25 euro." yes; "Maybe it should be 25?" no.
+    A negated quote settles only a decision that is itself negative: "we're not
+    going with a touch screen" settles "No touch screen", but cannot settle
+    "Use a touch screen". Negation is found by its words (not, no, won't ...)."""
+    text = _norm(quote)
+    if not text or HEDGES.search(text) or "?" in quote:
+        return False
+    return not NEGATED.search(text) or bool(NEGATED.search(_norm(decision)))
 
 
 def _settled(d: DecisionEvidence, index: QuoteIndex, notes: list[str]) -> int | None:
@@ -272,8 +314,9 @@ def _settled(d: DecisionEvidence, index: QuoteIndex, notes: list[str]) -> int | 
     quote = (d.settled_quote or "").strip()
     if not quote:
         return None
-    if not is_settled_wording(quote):
-        notes.append(f'"{d.text}": "stated as decided" quote is worded as a proposal, ignored: "{quote}"')
+    if not is_settled_wording(quote, d.text):
+        notes.append(f'"{d.text}": "stated as decided" quote is worded as a proposal, or negates the decision, '
+                     f'ignored: "{quote}"')
         return None
     pos = index.find(quote)
     if pos is None:
@@ -298,20 +341,25 @@ def verify(draft: MinutesDraft, index: QuoteIndex) -> MinutesResult:
                   open_questions_proposed=len(draft.open_questions), open_questions_kept=0,
                   owners_removed=0, deadlines_removed=0, quotes_ignored=0, owners_from_speaker=0,
                   owners_from_role=0, decisions_uncontested=0,
-                  given_proposed=len(draft.given), given_kept=0)
+                  given_proposed=len(draft.given), given_kept=0,
+                  assessments_proposed=len(draft.assessments), assessments_kept=0)
 
     decisions = []
     for d in draft.decisions:
-        pos = index.find(d.proposal_quote)
+        # A decision announced in one line ("So the case will be blue") has no
+        # separate proposal: the announcement is its proposal.
+        proposal = d.proposal_quote.strip() or d.settled_quote.strip()
+        pos = index.find(proposal)
         if pos is None:
             dropped.append(f'Decision dropped, proposal quote not in transcript: "{d.text}"')
             continue
         status, evidence, notes = decide_status(d, index, index.speaker_at(pos))
         dropped.extend(notes)
         checks["quotes_ignored"] += len(notes)
-        evidence.insert(0, index.evidence("proposal", d.proposal_quote, pos))
-        decisions.append(Decision(text=d.text, status=status, quote=d.proposal_quote,
-                                  evidence=sorted(evidence, key=lambda e: e.line)))
+        first = index.evidence("proposal", proposal, pos)
+        if not any(e.line == first.line and _norm(e.quote) == _norm(first.quote) for e in evidence):
+            evidence.insert(0, first)  # unless the same words are already there as "stated as decided"
+        decisions.append(Decision(text=d.text, status=status, quote=proposal, evidence=_unique(evidence)))
 
     actions = []
     for a in draft.action_items:
@@ -374,6 +422,16 @@ def verify(draft: MinutesDraft, index: QuoteIndex) -> MinutesResult:
         given.append(GivenFact(fact=g.fact, quote=g.quote, evidence=[index.evidence("given", g.quote, pos)]))
     checks["given_kept"] = len(given)
 
+    assessments = []
+    for a in draft.assessments:
+        pos = index.find(a.quote)
+        if pos is None:
+            dropped.append(f'Assessment dropped, quote not in transcript: "{a.topic}"')
+            continue
+        assessments.append(Assessment(topic=a.topic, verdict=a.verdict, quote=a.quote,
+                                      evidence=[index.evidence("assessment", a.quote, pos)]))
+    checks["assessments_kept"] = len(assessments)
+
     checks["decisions_kept"] = len(decisions)
     checks["open_questions_kept"] = len(questions)
     checks["decisions_agreed"] = sum(d.status == "agreed" for d in decisions)
@@ -381,7 +439,7 @@ def verify(draft: MinutesDraft, index: QuoteIndex) -> MinutesResult:
     checks["actions_kept"] = len(actions)
     checks["actions_agreed"] = sum(a.status == "agreed" for a in actions)
     minutes = Minutes(summary=draft.summary, minutes=draft.minutes, decisions=decisions,
-                      action_items=actions, open_questions=questions, given=given)
+                      action_items=actions, open_questions=questions, given=given, assessments=assessments)
     return MinutesResult(minutes, dropped, checks)
 
 
@@ -494,8 +552,8 @@ def _unique(evidence: list[Evidence]) -> list[Evidence]:
 
 
 def support_rate(checks: dict) -> float | None:
-    """Share of the LLM's decisions, action items, open questions and given facts whose evidence verified."""
-    kinds = ("decisions", "actions", "open_questions", "given")
+    """Share of the LLM's decisions, action items, open questions, given facts and assessments whose evidence verified."""
+    kinds = ("decisions", "actions", "open_questions", "given", "assessments")
     proposed = sum(checks.get(f"{k}_proposed", 0) for k in kinds)
     kept = sum(checks.get(f"{k}_kept", 0) for k in kinds)
     return round(kept / proposed, 3) if proposed else None
@@ -551,11 +609,49 @@ def write_minutes(segment_texts: list[str], call_structured, doubtful: set[int] 
             drafts.append(call_structured(system, header + user, MinutesDraft))
         draft = merge_drafts(drafts, call_text)
     result = verify(draft, QuoteIndex(evidence, starts, speakers, roles))
+    _add_participants(result, speakers, roles)
+    result.checks["parts"] = len(parts)
+    result.draft = draft
+    return result
+
+
+def _add_participants(result: MinutesResult, speakers: list[str | None] | None, roles: dict[str, str]) -> None:
     if speakers:
         result.minutes.participants = list(dict.fromkeys(s for s in speakers if s))
         result.minutes.roles = {p: roles[p] for p in result.minutes.participants if p in roles}
-    result.checks["parts"] = len(parts)
-    return result
+
+
+def reverify(result: MinutesResult, segment_texts: list[str], doubtful: set[int] | None,
+             starts: list[float] | None, speakers: list[str | None] | None,
+             roles: dict[str, str] | None = None, changes: dict[str, str] | None = None) -> MinutesResult:
+    """Rerun Python's checks on the stored LLM draft, e.g. after speakers were
+    renamed or merged, without asking the LLM again. `changes` ({old label: new
+    label}) is applied to the draft's own text first, so owners and summaries
+    written with the old names follow. Statuses are decided anew: two speakers
+    merged into one person can turn "agreed" into the proposer agreeing with themself."""
+    from meeting_assistant.speakers import replace_labels
+
+    draft = result.draft
+    if changes:
+        draft.summary = replace_labels(draft.summary, changes)
+        draft.minutes = [replace_labels(x, changes) for x in draft.minutes]
+        for d in draft.decisions:
+            d.text = replace_labels(d.text, changes)
+        for a in draft.action_items:
+            a.task, a.owner = replace_labels(a.task, changes), replace_labels(a.owner, changes)
+        for q in draft.open_questions:
+            q.question = replace_labels(q.question, changes)
+        for g in draft.given:
+            g.fact = replace_labels(g.fact, changes)
+        for a in draft.assessments:
+            a.topic, a.verdict = replace_labels(a.topic, changes), replace_labels(a.verdict, changes)
+    roles = {label: role for label, role in (roles or {}).items() if role}
+    _, evidence = format_transcript(segment_texts, doubtful, speakers)
+    new = verify(draft, QuoteIndex(evidence, starts, speakers, roles))
+    _add_participants(new, speakers, roles)
+    new.checks["parts"] = result.checks.get("parts", 1)
+    new.draft = draft
+    return new
 
 
 def _part_message(k: int, total: int, earlier: list[str], part_lines: list[str]) -> str:
@@ -597,9 +693,11 @@ def merge_drafts(drafts: list[MinutesDraft], call_text=None) -> MinutesDraft:
         except Exception:  # LLM failure: keep the parts' summaries joined, the record still works
             pass
 
-    minutes, decisions, actions, questions, given = [], [], [], [], []
+    minutes, decisions, actions, questions, given, assessments = [], [], [], [], [], []
     for d in drafts:
         given += [g for g in d.given if not any(_same(g.fact, x.fact) for x in given)]
+        assessments += [a for a in d.assessments
+                        if not any(_same(a.topic + " " + a.verdict, x.topic + " " + x.verdict) for x in assessments)]
         minutes += [m for m in d.minutes if not any(_same(m, x) for x in minutes)]
         for dec in d.decisions:
             match = next((x for x in decisions if _same(x.text, dec.text)
@@ -621,7 +719,7 @@ def merge_drafts(drafts: list[MinutesDraft], call_text=None) -> MinutesDraft:
                     setattr(match, quote_name, getattr(act, quote_name))
             match.agreement_quote = match.agreement_quote or act.agreement_quote
         questions += [q for q in d.open_questions if not any(_same(q.question, x.question) for x in questions)]
-    return MinutesDraft(given=given, summary=summary, minutes=minutes, decisions=decisions,
+    return MinutesDraft(given=given, summary=summary, minutes=minutes, assessments=assessments, decisions=decisions,
                         action_items=actions, open_questions=questions)
 
 
@@ -647,6 +745,11 @@ def to_markdown(m: Minutes) -> str:
     for g in m.given:
         lines += [f"- {g.fact}"] + _evidence_lines(g.evidence)
     if not m.given:
+        lines.append("- (none)")
+    lines += ["", "## Assessments (ratings and evaluations: not decisions)", ""]
+    for a in m.assessments:
+        lines += [f"- {a.topic}: {a.verdict}"] + _evidence_lines(a.evidence)
+    if not m.assessments:
         lines.append("- (none)")
     lines += ["", "## Decisions", ""]
     for d in m.decisions:
@@ -693,7 +796,9 @@ def rename_in_minutes(m: Minutes, changes: dict[str, str], line_speakers: list[s
         q.question = replace_labels(q.question, changes)
     for g in m.given:
         g.fact = replace_labels(g.fact, changes)
-    for item in [*m.decisions, *m.action_items, *m.open_questions, *m.given]:
+    for a in m.assessments:
+        a.topic, a.verdict = replace_labels(a.topic, changes), replace_labels(a.verdict, changes)
+    for item in [*m.decisions, *m.action_items, *m.open_questions, *m.given, *m.assessments]:
         for e in item.evidence:
             if e.speaker and e.line < len(line_speakers):
                 e.speaker = line_speakers[e.line]
@@ -704,7 +809,7 @@ if __name__ == "__main__":
         print("Usage: python -m meeting_assistant.minutes <audio file> [model size]")
         sys.exit(1)
     from meeting_assistant.hallucination import doubtful_indices, score_segments
-    from meeting_assistant.llm import LLMError, call_llm_structured
+    from meeting_assistant.llm import LLMError
     from meeting_assistant.stt import AudioInputError, load_model, transcribe
 
     audio, size = sys.argv[1], (sys.argv[2] if len(sys.argv) > 2 else "medium")
@@ -715,7 +820,7 @@ if __name__ == "__main__":
         sys.exit(1)
     doubtful = doubtful_indices(score_segments(t.segments, t.duration_s))
     try:
-        result = write_minutes([s.text for s in t.segments], call_llm_structured, doubtful,
+        result = write_minutes([s.text for s in t.segments], call_minutes_llm, doubtful,
                                [s.start for s in t.segments])
     except LLMError as e:
         print(f"Stage 3 failed: {e}")

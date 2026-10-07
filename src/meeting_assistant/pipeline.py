@@ -25,11 +25,11 @@ from dataclasses import asdict, dataclass, field, replace
 from datetime import datetime
 from pathlib import Path
 
-from meeting_assistant import llm
+from meeting_assistant import deliverables, llm
 from meeting_assistant.glossary import Term, build_glossary, load_packs, merge_terms, parse_user_terms
 from meeting_assistant.hallucination import SegmentFlag, doubtful_indices, score_segments
-from meeting_assistant.minutes import (MinutesResult, rename_in_minutes, support_rate, to_json, to_markdown,
-                                       write_minutes)
+from meeting_assistant.minutes import (MinutesResult, call_minutes_llm, rename_in_minutes, reverify, support_rate,
+                                       to_json, to_markdown, write_minutes)
 from meeting_assistant.paths import RUNS_DIR
 from meeting_assistant.refine import RefineResult, refine
 from meeting_assistant.speakers import (NameEvidence, Speaker, Turn, assign_speakers, line_labels,
@@ -62,6 +62,7 @@ class PipelineResult:
     speakers: list[Speaker] = field(default_factory=list)      # empty = speakers unknown
     name_evidence: list[NameEvidence] = field(default_factory=list)
     llm_usage: list = field(default_factory=list)
+    audio: str = ""  # the recording's file name, saved in run.json
 
     @property
     def raw_text(self) -> str:
@@ -100,7 +101,7 @@ class PipelineResult:
 
 
 def run(audio_path, model, glossary_text: str = "", packs: list[str] | None = None,
-        call_llm=llm.call_llm, call_structured=llm.call_llm_structured,
+        call_llm=llm.call_llm, call_structured=call_minutes_llm,
         model_size: str = "medium", runs_dir: Path = RUNS_DIR, on_stage=None,
         diarizer=None, num_speakers: int | None = None, attendees: str = "") -> PipelineResult:
     """Run every stage on one recording. `model` is a loaded faster-whisper
@@ -112,7 +113,7 @@ def run(audio_path, model, glossary_text: str = "", packs: list[str] | None = No
     diarizer(audio_path, num_speakers) and returns speaker turns; None skips
     the speaker stages. `attendees` are known names ("Priya, Rahul"): they are
     added to the glossary (so Whisper spells them right) and help naming."""
-    result = PipelineResult(stages=[StageStatus(name) for name in STAGES])
+    result = PipelineResult(stages=[StageStatus(name) for name in STAGES], audio=Path(audio_path).name)
     stt_stage, diar_stage, flag_stage, refine_stage, names_stage, minutes_stage = result.stages
     usage_start = len(llm.usage_log)
 
@@ -235,7 +236,12 @@ def rename_speakers(result: PipelineResult, names: dict[str, str],
     before = result.roles
     changes = speakers_mod.rename_speakers(result.speakers, names, roles)
     if (changes or result.roles != before) and result.minutes:
-        rename_in_minutes(result.minutes.minutes, changes, result.labels, result.roles)
+        if result.minutes.draft is not None:  # rerun the checks: a merge can change statuses
+            result.minutes = reverify(result.minutes, result.lines(), doubtful_indices(result.flags),
+                                      [seg.start for seg in result.segments], result.labels,
+                                      result.roles, changes)
+        else:
+            rename_in_minutes(result.minutes.minutes, changes, result.labels, result.roles)
     if (changes or result.roles != before) and result.run_dir:
         write_run(result, result.run_dir)
     return changes
@@ -288,7 +294,10 @@ def save(result: PipelineResult, runs_dir: Path) -> Path:
 
 
 def write_run(result: PipelineResult, run_dir: Path) -> None:
-    """Write transcripts, edit log, speakers, meeting record and run details."""
+    """Write the deliverables folder (deliverables.py), plus transcripts, edit
+    log, speakers, meeting record and run details for inspection."""
+    deliverables.write(run_dir, result.segments, result.lines(refined=False), result.lines(refined=True),
+                       result.labels, result.minutes.minutes if result.minutes else None, result.stages)
     (run_dir / "transcript_raw.txt").write_text(transcript_text(result, refined=False) + "\n", encoding="utf-8")
     (run_dir / "transcript_refined.txt").write_text(transcript_text(result, refined=True) + "\n",
                                                     encoding="utf-8")
@@ -307,6 +316,7 @@ def write_run(result: PipelineResult, run_dir: Path) -> None:
         (run_dir / "minutes.md").write_text(to_markdown(result.minutes.minutes), encoding="utf-8")
         (run_dir / "minutes.json").write_text(to_json(result.minutes.minutes), encoding="utf-8")
     details = {
+        "audio": result.audio,
         "stages": [asdict(s) for s in result.stages],
         "transcript": asdict(result.transcript) if result.transcript else None,
         "flags": [asdict(f) for f in result.flags],

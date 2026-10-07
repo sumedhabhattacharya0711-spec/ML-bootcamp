@@ -120,6 +120,7 @@ HEADER_HTML = """
      Speech-to-text runs on this machine; the two LLM steps use the provider set in <code>.env</code>.</p>
 </div>
 """
+# Shown after the deliverables folder and its zip: extra files for inspection.
 SAVED_FILES = ["minutes.md", "minutes.json", "transcript_raw.txt", "transcript_refined.txt",
                "speakers.json", "edit_log.json", "run.json"]
 SPEAKER_HEADERS = ["ID", "Name (edit me)", "Role (edit me)", "Found from", "Confidence", "Talk time", "Lines",
@@ -343,6 +344,8 @@ FAITHFULNESS_LABELS = {
     "decisions_uncontested": "Decisions stated as settled with no objection (not explicitly agreed)",
     "given_proposed": "Given facts (brief, budget, targets) proposed by the LLM",
     "given_kept": "Given facts kept (quote verified)",
+    "assessments_proposed": "Assessments (ratings, evaluations) proposed by the LLM",
+    "assessments_kept": "Assessments kept (quote verified)",
     "name_claims_proposed": "Name claims proposed by the LLM",
     "name_claims_accepted": "Name claims accepted by the checks",
 }
@@ -380,6 +383,17 @@ def _unavailable(reason: str):
     def diarizer(path, num_speakers=None):
         raise DiarizationError(reason)
     return diarizer
+
+
+def saved_files(result: PipelineResult) -> list[str]:
+    """The required deliverables first (and one zip with all of them), then the extras."""
+    if not result.run_dir:
+        return []
+    order = ["raw_transcript", "refined_transcript", "meeting_minutes", "key_decisions", "action_items", "STATUS"]
+    folder = result.run_dir / "deliverables"
+    found = sorted(folder.glob("*"), key=lambda f: (next((i for i, n in enumerate(order) if f.stem == n), 99), f.name))
+    extras = [result.run_dir / n for n in ["deliverables.zip"] + SAVED_FILES if (result.run_dir / n).exists()]
+    return [str(f) for f in found + extras]
 
 
 def run_meeting(audio_file, glossary_text, packs, size, diarize, num_speakers, attendees):
@@ -433,7 +447,7 @@ def run_meeting(audio_file, glossary_text, packs, size, diarize, num_speakers, a
         return
     result = outcome["result"]
     saved = json.loads((result.run_dir / "run.json").read_text(encoding="utf-8")) if result.run_dir else {}
-    files = [str(result.run_dir / n) for n in SAVED_FILES if result.run_dir and (result.run_dir / n).exists()]
+    files = saved_files(result)
     header = run_header(result, audio_path.name, glossary_text or "", packs or [], size)
     if not result.transcript:
         yield [gr.update(interactive=True), status_rows(result), header, "", "", [], [], []] + \
@@ -540,7 +554,9 @@ def build_ui(default_size: str) -> gr.Blocks:
             usage = gr.Dataframe(headers=["Provider", "Model", "Input tokens", "Output tokens", "Seconds"],
                                  label="LLM calls", interactive=False)
         with gr.Tab("Files"):
-            files = gr.File(label="Saved files for this run", file_count="multiple", interactive=False)
+            files = gr.File(label="Deliverables (raw and refined transcript, minutes, key decisions, action items; "
+                                  "each as readable .txt/.md and structured .json), deliverables.zip with all of "
+                                  "them, then extra files", file_count="multiple", interactive=False)
             run_json = gr.JSON(label="run.json")
 
         state = gr.State(None)  # the last PipelineResult, for renaming speakers

@@ -34,7 +34,7 @@ def action(task, quote, owner="unspecified", owner_quote="", deadline="unspecifi
 
 
 def draft(decisions=(), actions=(), questions=()):
-    return MinutesDraft(given=[], summary="Design meeting.", minutes=["Remote control design"],
+    return MinutesDraft(given=[], assessments=[], summary="Design meeting.", minutes=["Remote control design"],
                         decisions=list(decisions), action_items=list(actions),
                         open_questions=list(questions))
 
@@ -189,10 +189,10 @@ def test_long_transcript_is_written_in_parts_and_merged():
     def fake_structured(system, user, schema):
         sent.append(user)
         if "part 1 of" in user:
-            return MinutesDraft(given=[], summary="Case material discussed.", minutes=["Case material"],
+            return MinutesDraft(given=[], assessments=[], summary="Case material discussed.", minutes=["Case material"],
                                 decisions=[decision("Rubber case", "I propose we make the case out of rubber")],
                                 action_items=[], open_questions=[])
-        return MinutesDraft(given=[], summary="Costs and suppliers discussed.", minutes=["Case material", "Costs"],
+        return MinutesDraft(given=[], assessments=[], summary="Costs and suppliers discussed.", minutes=["Case material", "Costs"],
                             decisions=[decision("Rubber case", "I propose we make the case out of rubber",
                                                 agree=["rubber is a good idea, let's go with that"])],
                             action_items=[action("Send cost spreadsheet",
@@ -212,8 +212,8 @@ def test_long_transcript_is_written_in_parts_and_merged():
 
 def test_part_summary_merge_falls_back_when_llm_fails():
     from meeting_assistant.minutes import merge_drafts
-    a = MinutesDraft(given=[], summary="First half.", minutes=[], decisions=[], action_items=[], open_questions=[])
-    b = MinutesDraft(given=[], summary="Second half.", minutes=[], decisions=[], action_items=[], open_questions=[])
+    a = MinutesDraft(given=[], assessments=[], summary="First half.", minutes=[], decisions=[], action_items=[], open_questions=[])
+    b = MinutesDraft(given=[], assessments=[], summary="Second half.", minutes=[], decisions=[], action_items=[], open_questions=[])
 
     def broken(system, user):
         raise RuntimeError("rate limited")
@@ -394,7 +394,7 @@ def test_plain_statements_are_settled_hedges_and_questions_are_not():
 
 def test_given_facts_are_checked_and_listed_apart_from_decisions():
     from meeting_assistant.minutes import GivenEvidence
-    d = MinutesDraft(given=[GivenEvidence(fact="Selling price is 25 euro", quote="The selling price will be 25 euro"),
+    d = MinutesDraft(assessments=[], given=[GivenEvidence(fact="Selling price is 25 euro", quote="The selling price will be 25 euro"),
                             GivenEvidence(fact="Budget is 1 million", quote="our budget is one million")],
                      summary="Kickoff.", minutes=[], decisions=[], action_items=[], open_questions=[])
     result = verify(d, CHAIR_INDEX)
@@ -405,3 +405,59 @@ def test_given_facts_are_checked_and_listed_apart_from_decisions():
     given_part = md.split("## Given")[1].split("## Decisions")[0]
     assert "Selling price is 25 euro" in given_part and "Budget" not in given_part
     assert "- (none)" in md.split("## Decisions")[1].split("## Action items")[0]
+
+
+def test_negated_statements_are_not_settled():
+    from meeting_assistant.minutes import is_settled_wording
+    for quote in ("We're not going with titanium.", "We won't use rubber.", "No, it will not be 25 euro.",
+                  "It can't be more than 12 euro.", "Nobody wants a flip-top."):
+        assert not is_settled_wording(quote), quote
+
+
+def test_negated_settled_quote_does_not_make_a_decision():
+    d = decision("Titanium case", "It has to be shockproof", settled="No, shockproof is too expensive")
+    assert verify(draft([d]), CHAIR_INDEX).minutes.decisions[0].status == "open"
+
+
+def test_thinking_or_talking_is_not_volunteering():
+    from meeting_assistant.minutes import VOLUNTEER, _norm
+    for quote in ("I can see why", "let me think", "I'll think about it", "I can just say that",
+                  "Let me be honest", "I will admit it"):
+        assert not VOLUNTEER.search(_norm(quote)), quote
+    for quote in ("I'll send the report", "Let me check the price", "I can do the slides", "I'll take that"):
+        assert VOLUNTEER.search(_norm(quote)), quote
+
+
+def test_decision_announced_in_one_line_is_kept():
+    d = decision("Price 25 euro", "", settled="The selling price will be 25 euro")
+    result = verify(draft([d]), CHAIR_INDEX)
+    dec = result.minutes.decisions[0]
+    assert dec.status == "uncontested" and dec.quote == "The selling price will be 25 euro"
+    assert len(dec.evidence) == 1  # the announcement, once
+
+
+def test_negation_settles_a_negative_decision_only():
+    from meeting_assistant.minutes import is_settled_wording
+    assert is_settled_wording("We're not going with a touch screen.", "A touch screen will not be used")
+    assert is_settled_wording("We won't use rubber.", "No rubber case")
+    assert not is_settled_wording("We're not going with a touch screen.", "Use a touch screen")
+    assert not is_settled_wording("We're not going with a touch screen.")
+
+
+def test_negative_decision_stated_as_settled_is_uncontested():
+    d = decision("Shockproof is not needed", "", settled="No, shockproof is too expensive")
+    assert verify(draft([d]), CHAIR_INDEX).minutes.decisions[0].status == "uncontested"
+
+
+def test_assessments_are_checked_and_never_decisions():
+    from meeting_assistant.minutes import AssessmentEvidence
+    d = MinutesDraft(given=[], summary="Evaluation.", minutes=[], decisions=[], action_items=[], open_questions=[],
+                     assessments=[AssessmentEvidence(topic="Price", verdict="fine", quote="The selling price will be 25 euro"),
+                                  AssessmentEvidence(topic="Fashion", verdict="7", quote="fashion, I would say 7")])
+    result = verify(d, CHAIR_INDEX)
+    assert [(a.topic, a.verdict) for a in result.minutes.assessments] == [("Price", "fine")]
+    assert result.checks["assessments_proposed"] == 2 and result.checks["assessments_kept"] == 1
+    assert any("Assessment dropped" in n for n in result.dropped)
+    md = to_markdown(result.minutes)
+    assert "- Price: fine" in md.split("## Assessments")[1].split("## Decisions")[0]
+    assert result.minutes.decisions == []
