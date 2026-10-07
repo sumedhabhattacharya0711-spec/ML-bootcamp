@@ -1,7 +1,9 @@
 """Gradio front end for the meeting assistant (localhost only).
 
-  python app.py                      # http://127.0.0.1:7860
+  python app.py                      # http://127.0.0.1:7860 (this computer only)
   python app.py --model-size turbo   # start with another Whisper size
+  python app.py --share              # also print a temporary public gradio.live link
+  python app.py --host 0.0.0.0       # reachable from other devices on the same network
 
 The Whisper model is loaded once at startup and kept in memory; choosing a
 different size in the dropdown swaps it on the next Run. Everything else is
@@ -23,7 +25,7 @@ from meeting_assistant import llm
 from meeting_assistant.glossary import list_packs
 from meeting_assistant.minutes import to_markdown
 from meeting_assistant.pipeline import STAGES, PipelineResult, run
-from meeting_assistant.refine import UNSURE_PROB
+from meeting_assistant.refine import MATCH_SCORE, MATCH_SCORE_UNSURE, UNSURE_PROB
 from meeting_assistant.stt import SUPPORTED_EXTENSIONS, format_timestamp, load_model
 
 log = logging.getLogger("meeting_assistant.app")
@@ -354,8 +356,8 @@ def build_ui(default_size: str) -> gr.Blocks:
                                  label="Edit log (guard decisions)", interactive=False, wrap=True)
             hints = gr.Dataframe(headers=["Line", "Heard", "Term", "Score", "Sound", "Spelling",
                                           "Whisper unsure"],
-                                 label="Hints sent to the LLM (similarity 0-100; hint threshold 72, "
-                                       "65 when Whisper was unsure)", interactive=False, wrap=True)
+                                 label=f"Hints sent to the LLM (similarity 0-100; hint threshold {MATCH_SCORE}, "
+                                       f"{MATCH_SCORE_UNSURE} when Whisper was unsure)", interactive=False, wrap=True)
             possible = gr.Dataframe(headers=["Line", "Text", "Reason"],
                                     label="Possible errors (flagged by the LLM, never changed)",
                                     interactive=False, wrap=True)
@@ -379,6 +381,10 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Meeting assistant web UI (localhost).")
     parser.add_argument("--model-size", default="medium", choices=[v for _, v in MODEL_CHOICES])
     parser.add_argument("--port", type=int, default=7860)
+    parser.add_argument("--host", default="127.0.0.1",
+                        help="address to listen on; 0.0.0.0 makes the app reachable on your network")
+    parser.add_argument("--share", action="store_true",
+                        help="also create a temporary public link (gradio.live, valid ~72 hours)")
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO)
@@ -388,5 +394,5 @@ if __name__ == "__main__":
 
     demo = build_ui(args.model_size)
     demo.queue(default_concurrency_limit=1)  # one GPU, one model: one run at a time
-    demo.launch(server_name="127.0.0.1", server_port=args.port, theme=THEME, css=CSS,
+    demo.launch(server_name=args.host, server_port=args.port, share=args.share, theme=THEME, css=CSS,
                 footer_links=[])

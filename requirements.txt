@@ -1,21 +1,25 @@
-# Speech-to-text (WhisperX pulls in torch, pyannote VAD/diarization, faster-whisper)
-whisperx
+# Speech-to-text: Whisper through faster-whisper (CTranslate2 engine)
 faster-whisper
+# CUDA libraries so faster-whisper can use an NVIDIA GPU on Linux / WSL.
+# Without a GPU the app still works: Whisper falls back to the CPU (slower).
+nvidia-cublas-cu12; sys_platform == "linux"
+nvidia-cudnn-cu12>=9,<10; sys_platform == "linux"
 
 # Audio handling
 soundfile
 numpy
 
-# LLM stages (provider-agnostic for now; add the SDK once the model is chosen)
+# LLM stages: Groq (main) and Gemini (backup) through their OpenAI-compatible APIs
+openai
 httpx
 pydantic
 python-dotenv
-rapidfuzz        # fuzzy matching against the domain-term glossary
+rapidfuzz        # fuzzy matching: hint spelling score, quote verification
 jellyfish        # Metaphone codes for sound-alike matching in refine.py
 
 # UI
 gradio
 
-# Evaluation and tests
-jiwer            # word error rate
+# Tests and measurement
 pytest
+jiwer            # word error rate

@@ -6,8 +6,8 @@ guard reverts unsafe edits.
 
 1. Candidate spans: every 1-5 word window, never crossing a sentence end.
 2. Sound-alike score = average of Metaphone (sound) similarity and spelling
-   similarity. Keep matches above 72, or above 65 if Whisper was unsure of a
-   word. (Our adaptation: the paper's phonetic retriever is not public.)
+   similarity. Keep matches scoring 82 or more, or 75 or more if Whisper was
+   unsure of a word. (Our adaptation: the paper's phonetic retriever is not public.)
 3. Hints: best non-overlapping match per span, at most 15.
 4. LLM call with only the hinted lines (and their neighbours). No hints -> no call.
 5. Guard: word-level diff of raw vs corrected. Edits touching a number or a
