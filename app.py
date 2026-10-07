@@ -230,6 +230,7 @@ FAITHFULNESS_LABELS = {
     "deadlines_removed": "Deadlines not supported by a quote, set to unspecified",
     "quotes_ignored": "Agreement/rejection quotes ignored (backchannel or not found)",
     "edits_applied": "Refinement edits applied",
+    "parts": "Topic parts the transcript was split into (1 = one LLM call)",
 }
 
 

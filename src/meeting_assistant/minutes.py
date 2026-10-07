@@ -12,6 +12,7 @@ supports them. Lines flagged as possible hallucinations are marked
 Try it:  python -m meeting_assistant.minutes data/audio/ES2004a.wav
 """
 
+import os
 import re
 import sys
 from bisect import bisect_right
@@ -23,10 +24,16 @@ from pydantic import BaseModel
 from rapidfuzz import fuzz
 
 from meeting_assistant.paths import PROMPTS_DIR
+from meeting_assistant.segment import split_segments
 from meeting_assistant.stt import format_timestamp
 
 PROMPT_PATH = PROMPTS_DIR / "minutes_system.txt"
 QUOTE_MIN_SCORE = 90  # rapidfuzz.partial_ratio needed for a quote to count as real
+# Transcripts longer than this (estimated tokens) are split into topic parts, one
+# LLM call each, then merged. Groq's free tier allows ~8K tokens per minute, so one
+# call must fit the prompt + transcript + answer; a 17-minute meeting is ~3.5K.
+SEGMENT_MAX_TOKENS = int(os.getenv("MINUTES_SEGMENT_TOKENS", "4000"))
+SAME_ITEM_SCORE = 85  # rapidfuzz.token_set_ratio at which items from two parts are the same
 
 # A quote that is ONLY one of these is a backchannel, not agreement.
 BACKCHANNELS = {"mm hmm", "mhm", "mm", "uh huh", "hmm", "yeah", "yep", "yes", "okay", "ok",
@@ -302,13 +309,97 @@ def format_transcript(segment_texts: list[str],
 
 
 def write_minutes(segment_texts: list[str], call_structured, doubtful: set[int] | None = None,
-                  starts: list[float] | None = None, prompt_path: Path = PROMPT_PATH) -> MinutesResult:
+                  starts: list[float] | None = None, prompt_path: Path = PROMPT_PATH,
+                  call_text=None, max_tokens: int | None = None) -> MinutesResult:
     """Stage 3. `call_structured` is llm.call_llm_structured (or a fake in tests);
-    `starts` are the segments' start times, used to timestamp the evidence."""
+    `starts` are the segments' start times, used to timestamp the evidence.
+
+    Long transcripts are split into topic parts (segment.py). Each part is one
+    call that also sees the summaries of the earlier parts as context (recursive
+    summarization); the parts' drafts are then merged (`call_text`, e.g.
+    llm.call_llm, writes the overall summary) and verified against the whole
+    transcript, so a proposal in one part and its agreement in another still
+    combine into one agreed decision."""
     for_llm, evidence = format_transcript(segment_texts, doubtful)
     system = prompt_path.read_text(encoding="utf-8")
-    draft = call_structured(system, for_llm, MinutesDraft)
-    return verify(draft, QuoteIndex(evidence, starts))
+    lines = for_llm.split("\n")
+    parts = split_segments(lines, max_tokens or SEGMENT_MAX_TOKENS)
+    if len(parts) == 1:
+        draft = call_structured(system, for_llm, MinutesDraft)
+    else:
+        drafts = []
+        for k, (a, b) in enumerate(parts):
+            user = _part_message(k, len(parts), [d.summary for d in drafts], lines[a:b])
+            drafts.append(call_structured(system, user, MinutesDraft))
+        draft = merge_drafts(drafts, call_text)
+    result = verify(draft, QuoteIndex(evidence, starts))
+    result.checks["parts"] = len(parts)
+    return result
+
+
+def _part_message(k: int, total: int, earlier: list[str], part_lines: list[str]) -> str:
+    context = "\n".join(f"- Part {i + 1}: {s}" for i, s in enumerate(earlier)) or "- (this is the first part)"
+    return (f"This is part {k + 1} of {total} of a long meeting.\n\n"
+            f"EARLIER PARTS (context only, to resolve references; never quote from here):\n{context}\n\n"
+            f"TRANSCRIPT OF PART {k + 1}:\n" + "\n".join(part_lines) +
+            "\n\nReminder: every quote must be copied from the transcript lines of this part.")
+
+
+MERGE_SUMMARY_SYSTEM = (
+    "You merge summaries of consecutive parts of one meeting into a single summary of 3 to 6 "
+    "sentences. Use only the given summaries. Keep names, numbers and decisions exactly as "
+    "stated; do not upgrade proposals into decisions. Reply with the summary only.")
+
+
+def _same(a: str, b: str) -> bool:
+    return fuzz.token_set_ratio(_norm(a), _norm(b)) >= SAME_ITEM_SCORE
+
+
+def _union(a: list[str], b: list[str]) -> list[str]:
+    out = list(a)
+    for q in b:
+        if not any(_norm(q) == _norm(x) for x in out):
+            out.append(q)
+    return out
+
+
+def merge_drafts(drafts: list[MinutesDraft], call_text=None) -> MinutesDraft:
+    """Reduce step: one draft from the parts' drafts. Duplicates (the same item
+    seen in two parts) are merged and their quotes combined; nothing is decided
+    here, verify() still sets every status from the quotes."""
+    summaries = [d.summary for d in drafts if d.summary.strip()]
+    summary = " ".join(summaries)
+    if call_text and len(summaries) > 1:
+        try:
+            summary = call_text(MERGE_SUMMARY_SYSTEM,
+                                "\n".join(f"Part {i + 1}: {s}" for i, s in enumerate(summaries))).strip() or summary
+        except Exception:  # LLM failure: keep the parts' summaries joined, the record still works
+            pass
+
+    minutes, decisions, actions, questions = [], [], [], []
+    for d in drafts:
+        minutes += [m for m in d.minutes if not any(_same(m, x) for x in minutes)]
+        for dec in d.decisions:
+            match = next((x for x in decisions if _same(x.text, dec.text)
+                          or _norm(x.proposal_quote) == _norm(dec.proposal_quote)), None)
+            if match is None:
+                decisions.append(dec.model_copy(deep=True))
+            else:
+                match.agreement_quotes = _union(match.agreement_quotes, dec.agreement_quotes)
+                match.rejection_quotes = _union(match.rejection_quotes, dec.rejection_quotes)
+        for act in d.action_items:
+            match = next((x for x in actions if _same(x.task, act.task)), None)
+            if match is None:
+                actions.append(act.model_copy(deep=True))
+                continue
+            for field_name, quote_name in (("owner", "owner_quote"), ("deadline", "deadline_quote")):
+                if getattr(match, field_name).strip().lower() == "unspecified":
+                    setattr(match, field_name, getattr(act, field_name))
+                    setattr(match, quote_name, getattr(act, quote_name))
+            match.agreement_quote = match.agreement_quote or act.agreement_quote
+        questions += [q for q in d.open_questions if not any(_same(q.question, x.question) for x in questions)]
+    return MinutesDraft(summary=summary, minutes=minutes, decisions=decisions,
+                        action_items=actions, open_questions=questions)
 
 
 # ---------- Output: readable text and JSON from the same object ----------

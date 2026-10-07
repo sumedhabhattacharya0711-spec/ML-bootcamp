@@ -180,3 +180,42 @@ def test_open_question_kept_with_timestamp_and_invented_one_dropped():
     assert (qs[0].evidence[0].line, qs[0].evidence[0].start) == (8, 80.0)
     assert result.checks["open_questions_proposed"] == 2 and result.checks["open_questions_kept"] == 1
     assert "## Open questions" in to_markdown(result.minutes)
+
+
+def test_long_transcript_is_written_in_parts_and_merged():
+    from meeting_assistant.minutes import merge_drafts  # noqa: F401  (imported to show it exists)
+    sent = []
+
+    def fake_structured(system, user, schema):
+        sent.append(user)
+        if "part 1 of" in user:
+            return MinutesDraft(summary="Case material discussed.", minutes=["Case material"],
+                                decisions=[decision("Rubber case", "I propose we make the case out of rubber")],
+                                action_items=[], open_questions=[])
+        return MinutesDraft(summary="Costs and suppliers discussed.", minutes=["Case material", "Costs"],
+                            decisions=[decision("Rubber case", "I propose we make the case out of rubber",
+                                                agree=["rubber is a good idea, let's go with that"])],
+                            action_items=[action("Send cost spreadsheet",
+                                                 "Sarah will send the cost spreadsheet by Friday")],
+                            open_questions=[])
+
+    merged_summary = []
+    result = write_minutes(SEGMENTS, fake_structured, doubtful={9}, starts=STARTS, max_tokens=40,
+                           call_text=lambda s, u: merged_summary.append(u) or "Whole meeting summary.")
+    assert result.checks["parts"] == len(sent) >= 2
+    assert "EARLIER PARTS" in sent[1] and "Case material discussed." in sent[1]
+    m = result.minutes
+    assert [d.status for d in m.decisions] == ["agreed"]      # proposal and agreement merged
+    assert m.minutes == ["Case material", "Costs"]            # duplicate topic line merged
+    assert m.summary == "Whole meeting summary." and merged_summary
+
+
+def test_part_summary_merge_falls_back_when_llm_fails():
+    from meeting_assistant.minutes import merge_drafts
+    a = MinutesDraft(summary="First half.", minutes=[], decisions=[], action_items=[], open_questions=[])
+    b = MinutesDraft(summary="Second half.", minutes=[], decisions=[], action_items=[], open_questions=[])
+
+    def broken(system, user):
+        raise RuntimeError("rate limited")
+
+    assert merge_drafts([a, b], broken).summary == "First half. Second half."

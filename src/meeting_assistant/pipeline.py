@@ -122,9 +122,11 @@ def run(audio_path, model, glossary_text: str = "", packs: list[str] | None = No
     minutes_input = result.refined.refined if result.refined else lines
     try:
         result.minutes = write_minutes(minutes_input, call_structured, doubtful,
-                                       [seg.start for seg in segments])
+                                       [seg.start for seg in segments], call_text=call_llm)
         minutes_stage.status = "done"
-        minutes_stage.message = f"{len(result.minutes.dropped)} items removed or downgraded by the checks"
+        parts = result.minutes.checks.get("parts", 1)
+        minutes_stage.message = (f"{len(result.minutes.dropped)} items removed or downgraded by the checks"
+                                 + (f"; long meeting, written in {parts} topic parts" if parts > 1 else ""))
     except Exception as e:
         minutes_stage.status, minutes_stage.message = "failed", str(e)
     minutes_stage.seconds = _since(started)
