@@ -22,6 +22,11 @@ action_items: every task someone committed to or was given. For each one:
 - deadline_quote: the exact words that show the deadline, or "" if unspecified.
 - agreement_quote: the exact words where the owner accepted the task or volunteered for it ("Yes, I'll do that", "I'll send it"), or "" if nobody clearly took it on.
 
+open_questions: issues the meeting explicitly left unresolved or postponed ("we leave that open until we have the quote", "we still need to decide ..."). For each one:
+- question: the open issue in one short sentence.
+- quote: the exact words from the transcript that show it was left open.
+Do not list proposals here; they belong in decisions.
+
 Rules:
 - Every quote must be copied word for word from the transcript, without the line number. Short quotes (5 to 20 words) are best.
 - Keep names, numbers and negations exactly as spoken.

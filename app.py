@@ -217,13 +217,15 @@ def details(result: PipelineResult, saved: dict) -> tuple:
 
 
 FAITHFULNESS_LABELS = {
-    "evidence_support_rate": "Evidence support rate (items kept with verified quotes / items the LLM proposed)",
+    "evidence_support_rate": "Evidence support rate (decisions, action items and open questions kept with verified quotes / proposed)",
     "decisions_proposed": "Decisions proposed by the LLM",
     "decisions_kept": "Decisions kept (proposal quote verified)",
     "decisions_agreed": "Decisions marked agreed (verified agreement quote)",
     "actions_proposed": "Action items proposed by the LLM",
     "actions_kept": "Action items kept (task quote verified)",
     "actions_agreed": "Action items agreed (owner + verified acceptance quote)",
+    "open_questions_proposed": "Open questions proposed by the LLM",
+    "open_questions_kept": "Open questions kept (quote verified)",
     "owners_removed": "Owners not supported by a quote, set to unspecified",
     "deadlines_removed": "Deadlines not supported by a quote, set to unspecified",
     "quotes_ignored": "Agreement/rejection quotes ignored (backchannel or not found)",

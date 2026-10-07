@@ -39,7 +39,7 @@ def fake_llm(system, user):
 
 
 def fake_structured(system, user, schema):
-    return MinutesDraft(summary="Short meeting.", minutes=["Training jobs"], action_items=[],
+    return MinutesDraft(summary="Short meeting.", minutes=["Training jobs"], action_items=[], open_questions=[],
                         decisions=[DecisionEvidence(text="Keep it", proposal_quote="I propose we keep it",
                                                     agreement_quotes=["Yes, let's keep it"],
                                                     rejection_quotes=[])])

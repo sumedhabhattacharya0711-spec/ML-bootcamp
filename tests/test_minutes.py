@@ -1,7 +1,7 @@
 import json
 
 from meeting_assistant.minutes import (
-    ActionItemEvidence, DecisionEvidence, MinutesDraft, QuoteIndex, to_json, to_markdown,
+    ActionItemEvidence, DecisionEvidence, MinutesDraft, OpenQuestionEvidence, QuoteIndex, to_json, to_markdown,
     format_transcript, support_rate, verify, write_minutes,
 )
 
@@ -33,9 +33,10 @@ def action(task, quote, owner="unspecified", owner_quote="", deadline="unspecifi
                               agreement_quote=agreement_quote)
 
 
-def draft(decisions=(), actions=()):
+def draft(decisions=(), actions=(), questions=()):
     return MinutesDraft(summary="Design meeting.", minutes=["Remote control design"],
-                        decisions=list(decisions), action_items=list(actions))
+                        decisions=list(decisions), action_items=list(actions),
+                        open_questions=list(questions))
 
 
 def test_proposal_with_agreement_is_agreed():
@@ -167,3 +168,15 @@ def test_checks_count_what_was_kept_and_removed():
     assert (checks["decisions_proposed"], checks["decisions_kept"], checks["decisions_agreed"]) == (2, 1, 1)
     assert checks["owners_removed"] == 1
     assert support_rate(checks) == round(2 / 3, 3)
+
+
+def test_open_question_kept_with_timestamp_and_invented_one_dropped():
+    real = OpenQuestionEvidence(question="Battery supplier not chosen yet",
+                                quote="Someone should also check the battery supplier")
+    fake = OpenQuestionEvidence(question="Budget unclear", quote="We still need to settle the budget")
+    result = verify(draft(questions=[real, fake]), EVIDENCE)
+    qs = result.minutes.open_questions
+    assert [q.question for q in qs] == ["Battery supplier not chosen yet"]
+    assert (qs[0].evidence[0].line, qs[0].evidence[0].start) == (8, 80.0)
+    assert result.checks["open_questions_proposed"] == 2 and result.checks["open_questions_kept"] == 1
+    assert "## Open questions" in to_markdown(result.minutes)

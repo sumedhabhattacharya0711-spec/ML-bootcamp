@@ -52,11 +52,17 @@ class ActionItemEvidence(BaseModel):
     agreement_quote: str
 
 
+class OpenQuestionEvidence(BaseModel):
+    question: str
+    quote: str
+
+
 class MinutesDraft(BaseModel):
     summary: str
     minutes: list[str]
     decisions: list[DecisionEvidence]
     action_items: list[ActionItemEvidence]
+    open_questions: list[OpenQuestionEvidence]
 
 
 # ---------- The final record (shown in the UI, downloaded as JSON and Markdown) ----------
@@ -84,11 +90,18 @@ class ActionItem(BaseModel):
     evidence: list[Evidence] = []
 
 
+class OpenQuestion(BaseModel):
+    question: str
+    quote: str
+    evidence: list[Evidence] = []
+
+
 class Minutes(BaseModel):
     summary: str
     minutes: list[str]
     decisions: list[Decision]
     action_items: list[ActionItem]
+    open_questions: list[OpenQuestion] = []
 
 
 @dataclass
@@ -180,6 +193,7 @@ def verify(draft: MinutesDraft, index: QuoteIndex) -> MinutesResult:
     dropped = []
     checks = dict(decisions_proposed=len(draft.decisions), decisions_kept=0, decisions_agreed=0,
                   actions_proposed=len(draft.action_items), actions_kept=0, actions_agreed=0,
+                  open_questions_proposed=len(draft.open_questions), open_questions_kept=0,
                   owners_removed=0, deadlines_removed=0, quotes_ignored=0)
 
     decisions = []
@@ -217,12 +231,22 @@ def verify(draft: MinutesDraft, index: QuoteIndex) -> MinutesResult:
         actions.append(ActionItem(task=a.task, quote=a.task_quote, status=status,
                                   evidence=_unique(evidence), **checked))
 
+    questions = []
+    for q in draft.open_questions:
+        pos = index.find(q.quote)
+        if pos is None:
+            dropped.append(f'Open question dropped, quote not in transcript: "{q.question}"')
+            continue
+        questions.append(OpenQuestion(question=q.question, quote=q.quote,
+                                      evidence=[index.evidence("open question", q.quote, pos)]))
+
     checks["decisions_kept"] = len(decisions)
+    checks["open_questions_kept"] = len(questions)
     checks["decisions_agreed"] = sum(d.status == "agreed" for d in decisions)
     checks["actions_kept"] = len(actions)
     checks["actions_agreed"] = sum(a.status == "agreed" for a in actions)
     minutes = Minutes(summary=draft.summary, minutes=draft.minutes,
-                      decisions=decisions, action_items=actions)
+                      decisions=decisions, action_items=actions, open_questions=questions)
     return MinutesResult(minutes, dropped, checks)
 
 
@@ -254,9 +278,10 @@ def _unique(evidence: list[Evidence]) -> list[Evidence]:
 
 
 def support_rate(checks: dict) -> float | None:
-    """Share of the LLM's decisions and action items whose evidence verified."""
-    proposed = checks.get("decisions_proposed", 0) + checks.get("actions_proposed", 0)
-    kept = checks.get("decisions_kept", 0) + checks.get("actions_kept", 0)
+    """Share of the LLM's decisions, action items and open questions whose evidence verified."""
+    kinds = ("decisions", "actions", "open_questions")
+    proposed = sum(checks.get(f"{k}_proposed", 0) for k in kinds)
+    kept = sum(checks.get(f"{k}_kept", 0) for k in kinds)
     return round(kept / proposed, 3) if proposed else None
 
 
@@ -309,6 +334,11 @@ def to_markdown(m: Minutes) -> str:
         lines += [f"- {a.task} (owner: {a.owner}; deadline: {a.deadline}; status: {a.status})"]
         lines += _evidence_lines(a.evidence)
     if not m.action_items:
+        lines.append("- (none)")
+    lines += ["", "## Open questions", ""]
+    for q in m.open_questions:
+        lines += [f"- {q.question}"] + _evidence_lines(q.evidence)
+    if not m.open_questions:
         lines.append("- (none)")
     return "\n".join(lines) + "\n"
 
